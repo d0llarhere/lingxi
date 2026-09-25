@@ -1,8 +1,10 @@
 import type { IDBPDatabase } from 'idb';
 import { extractPdfText } from '../extraction/extractPdf';
-import type { LingxiDocument, ReadingCursor } from '../model/types';
+import type { LingxiDocument, PlaybackSettings, ReadingCursor } from '../model/types';
 import { segmentText } from '../segmentation/segmentText';
-import type { LingxiDB } from './db';
+import type { CursorRecord, LingxiDB } from './db';
+
+const DEFAULT_PLAYBACK_SPEED = 1;
 
 function titleFromFilename(filename: string): string {
   const withoutExtension = filename.replace(/\.pdf$/i, '');
@@ -119,11 +121,36 @@ export class LibraryRepository {
     ]);
   }
 
+  // Merges onto the existing record rather than overwriting it outright, so
+  // frequent position-only writes (every confirmed word boundary during
+  // playback) never clobber a previously saved voice/speed selection.
   async saveCursor(cursor: ReadingCursor): Promise<void> {
-    await this.db.put('cursors', cursor);
+    const existing = await this.db.get('cursors', cursor.documentId);
+    const record: CursorRecord = { ...existing, ...cursor };
+    await this.db.put('cursors', record);
   }
 
   async getCursor(documentId: string): Promise<ReadingCursor | undefined> {
     return this.db.get('cursors', documentId);
+  }
+
+  async savePlaybackSettings(
+    documentId: string,
+    settings: Partial<Pick<PlaybackSettings, 'selectedVoiceURI' | 'playbackSpeed'>>,
+  ): Promise<void> {
+    const existing = await this.db.get('cursors', documentId);
+    if (!existing) throw new Error(`No cursor record for document: ${documentId}`);
+    await this.db.put('cursors', { ...existing, ...settings });
+  }
+
+  // Defaults fill in for cursor records written before Phase 3, which never
+  // stored voice/speed.
+  async getPlaybackSettings(documentId: string): Promise<PlaybackSettings> {
+    const record = await this.db.get('cursors', documentId);
+    return {
+      documentId,
+      selectedVoiceURI: record?.selectedVoiceURI ?? null,
+      playbackSpeed: record?.playbackSpeed ?? DEFAULT_PLAYBACK_SPEED,
+    };
   }
 }

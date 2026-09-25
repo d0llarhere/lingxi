@@ -12,8 +12,11 @@ export type {
 } from './model/types';
 export { extractPdfText } from './extraction/extractPdf';
 export type { PdfExtractionResult } from './extraction/extractPdf';
+export { PlaybackController } from './playback/playbackController';
+export type { PlaybackControllerOptions, PlaybackState } from './playback/playbackController';
+export type { SpeakOptions, TTSEngine, VoiceInfo } from './playback/ttsEngine';
 export { segmentText } from './segmentation/segmentText';
 export { DB_NAME, DB_VERSION, openLingxiDB } from './storage/db';
-export type { LingxiDB } from './storage/db';
+export type { CursorRecord, LingxiDB } from './storage/db';
 export { LibraryRepository } from './storage/libraryRepository';
 export type { DocumentTextRecord, SourceFileRecord } from './storage/records';

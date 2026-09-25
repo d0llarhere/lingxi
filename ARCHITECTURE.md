@@ -3,7 +3,7 @@
 Offline-first PDF/text reading app with local TTS, shared across Web (PWA) and Android (Capacitor).
 Personal use only. No backend, no accounts, no analytics, no network dependency for core function.
 
-Status: **Phase 0 (scaffold), Phase 1 (document model + storage + text library), and Phase 2 (PDF extraction) implemented.**
+Status: **Phase 0 (scaffold), Phase 1 (document model + storage + text library), Phase 2 (PDF extraction), and Phase 3 (web TTS playback + word-level sync) implemented.**
 
 ---
 
@@ -189,7 +189,10 @@ interface TTSEngine {
   speak(text: string, opts: {
     voiceURI: string | null;
     rate: number;
-    onWordBoundary?: (charIndexInText: number) => void; // best-effort, see §8
+    // `confirmed` distinguishes a real engine boundary from a best-effort
+    // time-based estimate (see §8) — only confirmed events may advance the
+    // persisted cursor.
+    onWordBoundary?: (charIndexInText: number, confirmed: boolean) => void;
     onEnd: () => void;
     onError: (err: unknown) => void;
   }): void;
@@ -197,6 +200,13 @@ interface TTSEngine {
   listVoices(): Promise<VoiceInfo[]>;
 }
 ```
+
+**Implemented in `packages/core/src/playback/playbackController.ts`** (Phase 3). One addition beyond
+what's described below: every `speak()` call is tagged with an internal generation number, and any
+`onEnd`/`onError`/`onWordBoundary` callback whose generation no longer matches the latest one is ignored.
+This was added after a real bug found in manual Chrome testing — calling `TTSEngine.cancel()` (from
+pause/stop/seek) causes Chrome to fire the *cancelled* utterance's `onerror` with `error: 'canceled'`
+shortly afterward, racing with and otherwise clobbering the state pause()/stop() had just set.
 
 Deliberately **no `pause`/`resume` in the interface.** Web Speech API's `pause()`/`resume()` is known to
 be unreliable across browsers/voices (Chrome in particular has long-standing bugs where resume silently
@@ -244,6 +254,13 @@ operations; it holds no reference to `speechSynthesis` directly, only to whateve
   we're subsuming). `TTSEngine.onWordBoundary` stays optional in the interface as a defensive fallback
   (sentence-level highlighting) in case a given Android voice/OS version doesn't fire the callback, but
   it is not the primary plan.
+- **Confirmed in manual testing (Phase 3):** this is not a theoretical concern. On the Chrome build used
+  for manual testing, every available voice was a non-local Google network voice (`localService: false`),
+  and it fired **zero** `boundary` events per utterance — only `start`/`end`. `WebSpeechTTSEngine`
+  correctly detected this after the first utterance and fell back to the time-based estimator for
+  subsequent sentences; the UI's "approximate highlighting" notice appeared as designed, while the
+  persisted cursor correctly stayed pinned to confirmed sentence-start positions rather than the
+  estimated word shown on screen.
 
 ---
 
