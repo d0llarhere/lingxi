@@ -1,7 +1,13 @@
 import type { IDBPDatabase } from 'idb';
+import { extractPdfText } from '../extraction/extractPdf';
 import type { LingxiDocument, ReadingCursor } from '../model/types';
 import { segmentText } from '../segmentation/segmentText';
 import type { LingxiDB } from './db';
+
+function titleFromFilename(filename: string): string {
+  const withoutExtension = filename.replace(/\.pdf$/i, '');
+  return withoutExtension.trim().length > 0 ? withoutExtension : filename;
+}
 
 function initialCursor(documentId: string): ReadingCursor {
   return {
@@ -35,6 +41,41 @@ export class LibraryRepository {
       tx.objectStore('documents').put(doc),
       tx.objectStore('documentText').put({ documentId: doc.id, text }),
       tx.objectStore('cursors').put(initialCursor(doc.id)),
+      tx.done,
+    ]);
+
+    return doc;
+  }
+
+  // Extraction runs to completion before any IndexedDB write is issued, so a
+  // malformed PDF (extraction throws) leaves nothing persisted.
+  async createFromPdf(file: File): Promise<LingxiDocument> {
+    const arrayBuffer = await file.arrayBuffer();
+    const { text, pages, hasText } = await extractPdfText(arrayBuffer);
+
+    const now = Date.now();
+    const doc: LingxiDocument = {
+      id: crypto.randomUUID(),
+      title: titleFromFilename(file.name),
+      sourceType: 'pdf',
+      originalFilename: file.name,
+      createdAt: now,
+      lastOpenedAt: now,
+      extractionStatus: hasText ? 'ok' : 'no-text',
+      structure: segmentText(text, pages),
+    };
+
+    const tx = this.db.transaction(['documents', 'documentText', 'cursors', 'sourceFiles'], 'readwrite');
+    await Promise.all([
+      tx.objectStore('documents').put(doc),
+      tx.objectStore('documentText').put({ documentId: doc.id, text }),
+      tx.objectStore('cursors').put(initialCursor(doc.id)),
+      tx.objectStore('sourceFiles').put({
+        documentId: doc.id,
+        blob: file,
+        filename: file.name,
+        mimeType: file.type || 'application/pdf',
+      }),
       tx.done,
     ]);
 

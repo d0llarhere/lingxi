@@ -3,56 +3,61 @@ import type { DocumentStructure, PageRef, ParagraphRef, SentenceRef, WordRef } f
 const sentenceSegmenter = new Intl.Segmenter('en', { granularity: 'sentence' });
 const wordSegmenter = new Intl.Segmenter('en', { granularity: 'word' });
 
-// Builds the full page/paragraph/sentence/word index for a plain-text document.
-// Pasted text is treated as a single page; the same structure shape is reused
-// by the PDF pipeline later, which will populate multiple PageRefs instead.
-export function segmentText(text: string): DocumentStructure {
-  const page: PageRef = { index: 0, charStart: 0, charEnd: text.length };
+// Builds the full page/paragraph/sentence/word index for a document's plain
+// text. `pages` lets callers (the PDF pipeline) supply real page boundaries;
+// pasted text omits it and is treated as a single implicit page, which keeps
+// this function's original single-page behavior unchanged for that caller.
+export function segmentText(text: string, pages?: PageRef[]): DocumentStructure {
+  const resolvedPages: PageRef[] =
+    pages && pages.length > 0 ? pages : [{ index: 0, charStart: 0, charEnd: text.length }];
   const paragraphs: ParagraphRef[] = [];
   const sentences: SentenceRef[] = [];
   const words: WordRef[] = [];
 
-  if (text.length === 0) {
-    return { pages: [page], paragraphs, sentences, words };
-  }
+  for (const page of resolvedPages) {
+    const pageText = text.slice(page.charStart, page.charEnd);
+    if (pageText.length === 0) continue;
 
-  for (const [pStart, pEnd] of splitParagraphRanges(text)) {
-    const paragraphIndex = paragraphs.length;
-    paragraphs.push({ index: paragraphIndex, pageIndex: 0, charStart: pStart, charEnd: pEnd });
+    for (const [pStart, pEnd] of splitParagraphRanges(pageText)) {
+      const paragraphIndex = paragraphs.length;
+      const globalPStart = page.charStart + pStart;
+      const globalPEnd = page.charStart + pEnd;
+      paragraphs.push({ index: paragraphIndex, pageIndex: page.index, charStart: globalPStart, charEnd: globalPEnd });
 
-    const paragraphText = text.slice(pStart, pEnd);
-    for (const seg of sentenceSegmenter.segment(paragraphText)) {
-      if (seg.segment.trim().length === 0) continue;
+      const paragraphText = text.slice(globalPStart, globalPEnd);
+      for (const seg of sentenceSegmenter.segment(paragraphText)) {
+        if (seg.segment.trim().length === 0) continue;
 
-      const sStart = pStart + seg.index;
-      const sEnd = sStart + seg.segment.length;
-      const sentenceIndex = sentences.length;
-      sentences.push({
-        index: sentenceIndex,
-        paragraphIndex,
-        pageIndex: 0,
-        charStart: sStart,
-        charEnd: sEnd,
-        text: seg.segment,
-      });
-
-      for (const wseg of wordSegmenter.segment(seg.segment)) {
-        if (!wseg.isWordLike) continue;
-        const wStart = sStart + wseg.index;
-        words.push({
-          index: words.length,
-          sentenceIndex,
+        const sStart = globalPStart + seg.index;
+        const sEnd = sStart + seg.segment.length;
+        const sentenceIndex = sentences.length;
+        sentences.push({
+          index: sentenceIndex,
           paragraphIndex,
-          pageIndex: 0,
-          charStart: wStart,
-          charEnd: wStart + wseg.segment.length,
-          text: wseg.segment,
+          pageIndex: page.index,
+          charStart: sStart,
+          charEnd: sEnd,
+          text: seg.segment,
         });
+
+        for (const wseg of wordSegmenter.segment(seg.segment)) {
+          if (!wseg.isWordLike) continue;
+          const wStart = sStart + wseg.index;
+          words.push({
+            index: words.length,
+            sentenceIndex,
+            paragraphIndex,
+            pageIndex: page.index,
+            charStart: wStart,
+            charEnd: wStart + wseg.segment.length,
+            text: wseg.segment,
+          });
+        }
       }
     }
   }
 
-  return { pages: [page], paragraphs, sentences, words };
+  return { pages: resolvedPages, paragraphs, sentences, words };
 }
 
 function splitParagraphRanges(text: string): Array<[number, number]> {

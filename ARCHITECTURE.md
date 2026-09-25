@@ -3,7 +3,7 @@
 Offline-first PDF/text reading app with local TTS, shared across Web (PWA) and Android (Capacitor).
 Personal use only. No backend, no accounts, no analytics, no network dependency for core function.
 
-Status: **Phase 0 (scaffold) and Phase 1 (document model + storage + text library) implemented.**
+Status: **Phase 0 (scaffold), Phase 1 (document model + storage + text library), and Phase 2 (PDF extraction) implemented.**
 
 ---
 

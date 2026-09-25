@@ -10,7 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "idb": "^8.0.0"
+    "idb": "^8.0.0",
+    "pdfjs-dist": "^6.3.289"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.0.0",

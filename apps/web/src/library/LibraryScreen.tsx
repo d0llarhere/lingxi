@@ -1,5 +1,5 @@
 import type { LingxiDocument } from '@lingxi/core';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useLibrary } from './LibraryProvider';
 
 interface LibraryScreenProps {
@@ -14,6 +14,8 @@ export function LibraryScreen({ onOpenDocument }: LibraryScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [importingPdf, setImportingPdf] = useState(false);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
     if (!repository) return;
@@ -37,6 +39,23 @@ export function LibraryScreen({ onOpenDocument }: LibraryScreenProps) {
     setTitle('');
     setPastedText('');
     await refresh();
+  }
+
+  async function handleImportPdf(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!repository || !file) return;
+
+    setImportingPdf(true);
+    setError(null);
+    try {
+      await repository.createFromPdf(file);
+      await refresh();
+    } catch {
+      setError('Could not read this PDF. It may be corrupted.');
+    } finally {
+      setImportingPdf(false);
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
+    }
   }
 
   async function handleDelete(id: string) {
@@ -64,6 +83,18 @@ export function LibraryScreen({ onOpenDocument }: LibraryScreenProps) {
   return (
     <section>
       <h1>Library</h1>
+
+      <div>
+        <h2>Import PDF</h2>
+        <input
+          ref={pdfInputRef}
+          type="file"
+          accept="application/pdf"
+          onChange={handleImportPdf}
+          disabled={importingPdf}
+        />
+        {importingPdf && <p>Importing…</p>}
+      </div>
 
       <form onSubmit={handleAdd}>
         <h2>Add pasted text</h2>
@@ -97,7 +128,10 @@ export function LibraryScreen({ onOpenDocument }: LibraryScreenProps) {
               </>
             ) : (
               <>
-                <button onClick={() => onOpenDocument(doc.id)}>{doc.title}</button>
+                <button onClick={() => onOpenDocument(doc.id)}>
+                  {doc.title}
+                  {doc.sourceType === 'pdf' ? ' (PDF)' : ''}
+                </button>
                 <button onClick={() => startRename(doc)}>Rename</button>
                 <button onClick={() => handleDelete(doc.id)}>Delete</button>
               </>

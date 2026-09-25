@@ -10,6 +10,8 @@ export type {
   SourceType,
   WordRef,
 } from './model/types';
+export { extractPdfText } from './extraction/extractPdf';
+export type { PdfExtractionResult } from './extraction/extractPdf';
 export { segmentText } from './segmentation/segmentText';
 export { DB_NAME, DB_VERSION, openLingxiDB } from './storage/db';
 export type { LingxiDB } from './storage/db';

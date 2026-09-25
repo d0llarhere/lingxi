@@ -40,7 +40,11 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
     <section>
       <button onClick={onBack}>Back to library</button>
       <h1>{doc.title}</h1>
-      <article style={{ whiteSpace: 'pre-wrap' }}>{text}</article>
+      {doc.extractionStatus === 'no-text' ? (
+        <p role="alert">This PDF appears to contain scanned/image pages. OCR is not enabled yet.</p>
+      ) : (
+        <article style={{ whiteSpace: 'pre-wrap' }}>{text}</article>
+      )}
     </section>
   );
 }
