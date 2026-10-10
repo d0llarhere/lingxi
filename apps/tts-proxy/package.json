@@ -1,0 +1,14 @@
+{
+  "name": "@lingxi/tts-proxy",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "src/server.mjs",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "dev": "node src/server.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
