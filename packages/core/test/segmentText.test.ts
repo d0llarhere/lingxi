@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { segmentText } from '../src/segmentation/segmentText';
+import { normalizeLineWraps, segmentText } from '../src/segmentation/segmentText';
 
 describe('segmentText', () => {
   it('produces a single page spanning the whole text', () => {
@@ -42,6 +42,42 @@ describe('segmentText', () => {
     expect(structure.paragraphs).toHaveLength(0);
     expect(structure.sentences).toHaveLength(0);
     expect(structure.words).toHaveLength(0);
+  });
+
+  it('normalizeLineWraps collapses a lone line-wrap \\n to a space but leaves \\n{2,} paragraph breaks untouched', () => {
+    expect(normalizeLineWraps('wrapped\nline')).toBe('wrapped line');
+    expect(normalizeLineWraps('para one\n\npara two')).toBe('para one\n\npara two');
+    expect(normalizeLineWraps('a\nb\n\nc\nd')).toBe('a b\n\nc d');
+  });
+
+  it('normalizeLineWraps is length-preserving (every other char keeps its exact position)', () => {
+    const text = 'line one\nline two\n\nnext paragraph';
+    expect(normalizeLineWraps(text)).toHaveLength(text.length);
+  });
+
+  // Regression: pdf.js/pdftotext emit one bare \n per *visual* PDF line, not
+  // per paragraph (see extractPdf.ts's buildPageText and ARCHITECTURE.md's
+  // TTS chunking note). Intl.Segmenter's sentence-boundary rules (UAX #29
+  // SB4) treat any \n as an unconditional sentence break regardless of
+  // punctuation — left unnormalized, a single prose sentence wrapped across
+  // three visual PDF lines would fragment into three separate "sentences",
+  // each becoming its own audible-gap TTS utterance one layer up in
+  // PlaybackController.
+  it('does not fracture a sentence into multiple sentences at a bare PDF line-wrap \\n', () => {
+    const wrappedPdfText = 'This sentence wraps\nacross three\nvisual PDF lines before it ends.';
+    const structure = segmentText(wrappedPdfText);
+    expect(structure.sentences).toHaveLength(1);
+    expect(structure.sentences[0]?.text).toBe('This sentence wraps across three visual PDF lines before it ends.');
+  });
+
+  it('still splits into separate sentences at a real paragraph break (\\n{2,}), even without punctuation', () => {
+    const text = 'First paragraph wraps\nacross two lines\n\nSecond paragraph starts here';
+    const structure = segmentText(text);
+    expect(structure.paragraphs).toHaveLength(2);
+    expect(structure.sentences.map((s) => s.text)).toEqual([
+      'First paragraph wraps across two lines',
+      'Second paragraph starts here',
+    ]);
   });
 
   it('handles long text with consistent offsets throughout', () => {

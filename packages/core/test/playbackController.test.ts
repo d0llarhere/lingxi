@@ -42,7 +42,8 @@ function initialCursor(documentId: string): ReadingCursor {
 
 function makeController(
   structure: DocumentStructure,
-  overrides: Partial<{ persistCursor: (c: ReadingCursor) => void }> = {},
+  documentText: string = THREE_SENTENCE_TEXT,
+  overrides: Partial<{ persistCursor: (c: ReadingCursor) => void; chunkTargetChars: number }> = {},
 ) {
   const documentId = 'doc-1';
   const engine = new FakeTTSEngine();
@@ -55,6 +56,16 @@ function makeController(
   const controller = new PlaybackController({
     documentId,
     structure,
+    documentText,
+    // Almost every test below exercises per-sentence mechanics (cursor
+    // advancement, pause/resume, boundary mapping) written against the old
+    // one-sentence-per-speak() design. Forcing chunkTargetChars down to 1
+    // reproduces that exact granularity (buildChunk always includes at
+    // least one full sentence before checking the target) without needing
+    // every short test fixture to also stay suspiciously under the real
+    // ~900 char default. Chunk-grouping itself is covered by its own tests
+    // further down, which override this back up explicitly.
+    chunkTargetChars: overrides.chunkTargetChars ?? 1,
     initialCursor: initialCursor(documentId),
     initialVoiceURI: null,
     initialRate: 1,
@@ -269,7 +280,7 @@ describe('PlaybackController', () => {
 
   it('10b. progress is 0 (not NaN) for a document with no words', () => {
     const empty = segmentText('');
-    const { controller } = makeController(empty);
+    const { controller } = makeController(empty, '');
     expect(controller.getProgress()).toBe(0);
   });
 
@@ -314,6 +325,7 @@ describe('PlaybackController', () => {
     const controller = new PlaybackController({
       documentId: 'doc-1',
       structure,
+      documentText: THREE_SENTENCE_TEXT,
       initialCursor: {
         documentId: 'doc-1',
         wordIndex: word2.index,
@@ -337,7 +349,7 @@ describe('PlaybackController', () => {
 
   it('14. is a safe no-op on an empty document', () => {
     const empty = segmentText('');
-    const { controller, engine } = makeController(empty);
+    const { controller, engine } = makeController(empty, '');
 
     controller.play();
     controller.pause();
@@ -355,7 +367,7 @@ describe('PlaybackController', () => {
   it('15. handles a long document (many sentences) without breaking cursor correctness', () => {
     const longText = Array.from({ length: 500 }, (_, i) => `Sentence number ${i} has some words in it.`).join(' ');
     const longStructure = segmentText(longText);
-    const { controller, engine } = makeController(longStructure);
+    const { controller, engine } = makeController(longStructure, longText);
 
     controller.play();
     for (let i = 0; i < longStructure.sentences.length - 1; i++) {
@@ -443,5 +455,94 @@ describe('PlaybackController', () => {
     const callsWhilePaused = engine.speakCalls.length;
     controller.setSpeed(0.75);
     expect(engine.speakCalls).toHaveLength(callsWhilePaused); // no speak while paused
+  });
+});
+
+// Regression coverage for the chunking fix: synthesizing one sentence per
+// speak() call gave every sentence boundary an audible gap. All tests above
+// force chunkTargetChars down to 1 to preserve that old per-sentence
+// granularity for mechanics unrelated to chunking; these instead exercise
+// actual multi-sentence grouping with chunkTargetChars overridden back up.
+describe('PlaybackController chunking', () => {
+  const SIX_SENTENCE_TEXT = 'Alpha one. Beta two. Gamma three. Delta four. Echo five. Foxtrot six.';
+
+  function makeChunkedController() {
+    const sixStructure = segmentText(SIX_SENTENCE_TEXT);
+    const s = sixStructure.sentences;
+    const first = s[0];
+    const third = s[2];
+    if (!first || !third) throw new Error('expected at least three sentences');
+    // Exactly large enough to include sentences 0-2 ("Alpha"/"Beta"/"Gamma")
+    // and stop there — sentence 3 ("Delta") would push accumulatedLength
+    // past this on its own next iteration.
+    const chunkTargetChars = third.charEnd - first.charStart;
+    const result = makeController(sixStructure, SIX_SENTENCE_TEXT, { chunkTargetChars });
+    return { ...result, sixStructure, chunkTargetChars };
+  }
+
+  it('groups multiple consecutive sentences into a single speak() call, sliced exactly from the document text', () => {
+    const { controller, engine, sixStructure } = makeChunkedController();
+    const s = sixStructure.sentences;
+    const first = s[0]!;
+    const third = s[2]!;
+
+    controller.play();
+
+    expect(engine.speakCalls).toHaveLength(1);
+    expect(engine.lastSpeak!.text).toBe(SIX_SENTENCE_TEXT.slice(first.charStart, third.charEnd));
+    expect(engine.lastSpeak!.text).toContain('Alpha');
+    expect(engine.lastSpeak!.text).toContain('Beta');
+    expect(engine.lastSpeak!.text).toContain('Gamma');
+    expect(engine.lastSpeak!.text).not.toContain('Delta');
+  });
+
+  it('offers the next whole chunk (not just the next sentence) as lookahead text', () => {
+    const { controller, engine } = makeChunkedController();
+
+    controller.play();
+
+    const lookahead = engine.lastSpeak!.opts.lookaheadTexts?.[0] ?? '';
+    expect(lookahead.startsWith('Delta')).toBe(true);
+    // The lookahead chunk should itself span multiple sentences (Delta +
+    // Echo, at least), not fall back to single-sentence lookahead.
+    expect(lookahead).toContain('Echo');
+  });
+
+  it('a confirmed boundary into the chunk\'s second or third sentence resolves to that exact word, not the first sentence\'s', () => {
+    const { controller, engine, sixStructure } = makeChunkedController();
+    const betaFirstWord = sixStructure.words.find((w) => w.sentenceIndex === 1);
+    if (!betaFirstWord) throw new Error('expected a word in the Beta sentence');
+
+    controller.play();
+    const baseOffset = sixStructure.sentences[0]!.charStart;
+    const charIndexInUtterance = betaFirstWord.charStart - baseOffset;
+
+    engine.lastSpeak!.opts.onWordBoundary?.(charIndexInUtterance, true);
+
+    expect(controller.getCursor().wordIndex).toBe(betaFirstWord.index);
+    expect(controller.getCursor().sentenceIndex).toBe(1);
+  });
+
+  it('onEnd after a multi-sentence chunk resumes at the sentence right after the whole chunk, not just the next one', () => {
+    const { controller, engine, sixStructure } = makeChunkedController();
+
+    controller.play();
+    engine.lastSpeak!.opts.onEnd();
+
+    expect(controller.getCursor().sentenceIndex).toBe(3); // Delta — not 1 (Beta)
+    expect(engine.lastSpeak!.text.startsWith('Delta')).toBe(true);
+  });
+
+  it('a single sentence longer than chunkTargetChars is still sent whole, never split mid-sentence', () => {
+    const longSentenceText = `${'word '.repeat(50).trim()}. Short second sentence.`;
+    const structure = segmentText(longSentenceText);
+    const firstSentence = structure.sentences[0];
+    if (!firstSentence) throw new Error('expected a sentence');
+    // A tiny target smaller than the first sentence alone.
+    const { controller, engine } = makeController(structure, longSentenceText, { chunkTargetChars: 5 });
+
+    controller.play();
+
+    expect(engine.lastSpeak!.text).toBe(longSentenceText.slice(0, firstSentence.charEnd));
   });
 });

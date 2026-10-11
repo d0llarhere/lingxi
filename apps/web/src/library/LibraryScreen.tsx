@@ -1,6 +1,15 @@
-import type { LingxiDocument } from '@lingxi/core';
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { computeProgress, type LingxiDocument } from '@lingxi/core';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { AppShell } from '../components/AppShell';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { SearchIcon } from '../components/icons';
+import { ThemeToggle } from '../theme/ThemeToggle';
+import { AddMenu } from './AddMenu';
+import { DocumentCard, type DocumentCardData } from './DocumentCard';
+import { EmptyState } from './EmptyState';
 import { useLibrary } from './LibraryProvider';
+import { PasteTextDialog } from './PasteTextDialog';
+import { RenameDialog } from './RenameDialog';
 
 interface LibraryScreenProps {
   onOpenDocument: (documentId: string) => void;
@@ -8,18 +17,30 @@ interface LibraryScreenProps {
 
 export function LibraryScreen({ onOpenDocument }: LibraryScreenProps) {
   const { repository, ready } = useLibrary();
-  const [documents, setDocuments] = useState<LingxiDocument[]>([]);
-  const [title, setTitle] = useState('');
-  const [pastedText, setPastedText] = useState('');
+  const [cards, setCards] = useState<DocumentCardData[] | null>(null);
+  const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
   const [importingPdf, setImportingPdf] = useState(false);
+  const [pasteDialogOpen, setPasteDialogOpen] = useState(false);
+  const [renamingDoc, setRenamingDoc] = useState<LingxiDocument | null>(null);
+  const [deletingDoc, setDeletingDoc] = useState<LingxiDocument | null>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
     if (!repository) return;
-    setDocuments(await repository.listDocuments());
+    const docs = await repository.listDocuments();
+    const data = await Promise.all(
+      docs.map(async (doc): Promise<DocumentCardData> => {
+        const cursor = await repository.getCursor(doc.id);
+        const lastPage = doc.structure.pages.at(-1);
+        const totalLength = lastPage ? lastPage.charEnd : 0;
+        const progress = cursor ? computeProgress(cursor.charOffset, totalLength) : 0;
+        const totalPages = doc.structure.pages.length;
+        const currentPage = cursor && totalPages > 1 ? cursor.pageIndex + 1 : null;
+        return { doc, progress, currentPage, totalPages };
+      }),
+    );
+    setCards(data);
   }
 
   useEffect(() => {
@@ -27,17 +48,9 @@ export function LibraryScreen({ onOpenDocument }: LibraryScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repository]);
 
-  async function handleAdd(event: FormEvent) {
-    event.preventDefault();
+  async function handlePasteSubmit(title: string, text: string) {
     if (!repository) return;
-    if (!title.trim() || !pastedText.trim()) {
-      setError('Title and text are both required.');
-      return;
-    }
-    setError(null);
-    await repository.createFromPastedText(title.trim(), pastedText);
-    setTitle('');
-    setPastedText('');
+    await repository.createFromPastedText(title, text);
     await refresh();
   }
 
@@ -49,96 +62,159 @@ export function LibraryScreen({ onOpenDocument }: LibraryScreenProps) {
     setError(null);
     try {
       await repository.createFromPdf(file);
-      await refresh();
-    } catch {
-      setError('Could not read this PDF. It may be corrupted.');
-    } finally {
+    } catch (err) {
+      // Logged so real extraction failures (encrypted/malformed PDFs, etc.)
+      // are diagnosable instead of only ever showing the generic message.
+      console.error('PDF import failed', err);
+      setError('Could not read this PDF. It may be corrupted or password-protected.');
       setImportingPdf(false);
       if (pdfInputRef.current) pdfInputRef.current.value = '';
+      return;
     }
-  }
-
-  async function handleDelete(id: string) {
-    if (!repository) return;
-    await repository.deleteDocument(id);
+    setImportingPdf(false);
+    if (pdfInputRef.current) pdfInputRef.current.value = '';
+    // Deliberately outside the above try/catch: a failure here is a library
+    // refresh bug, not a PDF problem, and must not be reported as one.
     await refresh();
   }
 
-  function startRename(doc: LingxiDocument) {
-    setRenamingId(doc.id);
-    setRenameValue(doc.title);
-  }
-
-  async function commitRename(id: string) {
-    if (!repository || !renameValue.trim()) return;
-    await repository.rename(id, renameValue.trim());
-    setRenamingId(null);
+  async function handleConfirmDelete() {
+    if (!repository || !deletingDoc) return;
+    await repository.deleteDocument(deletingDoc.id);
+    setDeletingDoc(null);
     await refresh();
   }
 
-  if (!ready) {
-    return <p>Loading library…</p>;
+  async function handleRenameSubmit(title: string) {
+    if (!repository || !renamingDoc) return;
+    await repository.rename(renamingDoc.id, title);
+    await refresh();
   }
+
+  const filtered = useMemo(() => {
+    if (!cards) return [];
+    const q = query.trim().toLowerCase();
+    if (!q) return cards;
+    return cards.filter((c) => c.doc.title.toLowerCase().includes(q));
+  }, [cards, query]);
+
+  const continueReading = useMemo(() => {
+    if (query.trim()) return null;
+    const inProgress = (cards ?? []).filter((c) => c.progress > 0 && c.progress < 1);
+    if (inProgress.length === 0) return null;
+    return inProgress.reduce((a, b) => (a.doc.lastOpenedAt > b.doc.lastOpenedAt ? a : b));
+  }, [cards, query]);
+
+  const hiddenPdfInput = (
+    <input
+      ref={pdfInputRef}
+      type="file"
+      accept="application/pdf"
+      onChange={handleImportPdf}
+      disabled={importingPdf}
+      className="visually-hidden"
+      aria-label="Import PDF file"
+    />
+  );
 
   return (
-    <section>
-      <h1>Library</h1>
+    <AppShell
+      start={
+        <span className="brand">
+          <span className="brand-mark">灵</span>Lingxi
+        </span>
+      }
+      end={
+        <>
+          <label className="library-search field" style={{ margin: 0 }}>
+            <span className="visually-hidden">Search your library</span>
+            <span style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <SearchIcon />
+              <input
+                className="input"
+                placeholder="Search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </span>
+          </label>
+          <ThemeToggle />
+        </>
+      }
+    >
+      {hiddenPdfInput}
 
-      <div>
-        <h2>Import PDF</h2>
-        <input
-          ref={pdfInputRef}
-          type="file"
-          accept="application/pdf"
-          onChange={handleImportPdf}
-          disabled={importingPdf}
-        />
-        {importingPdf && <p>Importing…</p>}
+      <div className="library-page">
+        {!ready || !cards ? (
+          <p className="status-message">Loading library…</p>
+        ) : cards.length === 0 ? (
+          <EmptyState onImportPdf={() => pdfInputRef.current?.click()} onPasteText={() => setPasteDialogOpen(true)} />
+        ) : (
+          <>
+            {continueReading && (
+              <section>
+                <div className="library-section-header">
+                  <h2 className="library-section-title">Continue Reading</h2>
+                </div>
+                <DocumentCard
+                  data={continueReading}
+                  featured
+                  onOpen={() => onOpenDocument(continueReading.doc.id)}
+                  onRename={() => setRenamingDoc(continueReading.doc)}
+                  onDelete={() => setDeletingDoc(continueReading.doc)}
+                />
+              </section>
+            )}
+
+            <section>
+              <div className="library-section-header">
+                <h2 className="library-section-title">{query.trim() ? 'Results' : 'All Documents'}</h2>
+                <AddMenu onImportPdf={() => pdfInputRef.current?.click()} onPasteText={() => setPasteDialogOpen(true)} />
+              </div>
+
+              {error && <p className="error-message">{error}</p>}
+              {importingPdf && <p className="status-message">Importing…</p>}
+
+              {filtered.length === 0 ? (
+                <p className="status-message">No documents match "{query}".</p>
+              ) : (
+                <div className="document-grid">
+                  {filtered.map((card) => (
+                    <DocumentCard
+                      key={card.doc.id}
+                      data={card}
+                      onOpen={() => onOpenDocument(card.doc.id)}
+                      onRename={() => setRenamingDoc(card.doc)}
+                      onDelete={() => setDeletingDoc(card.doc)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </div>
 
-      <form onSubmit={handleAdd}>
-        <h2>Add pasted text</h2>
-        <div>
-          <label htmlFor="new-doc-title">Title</label>
-          <input id="new-doc-title" value={title} onChange={(e) => setTitle(e.target.value)} />
-        </div>
-        <div>
-          <label htmlFor="new-doc-text">Text</label>
-          <textarea
-            id="new-doc-text"
-            value={pastedText}
-            onChange={(e) => setPastedText(e.target.value)}
-            rows={6}
-          />
-        </div>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit">Add to library</button>
-      </form>
+      {pasteDialogOpen && <PasteTextDialog onClose={() => setPasteDialogOpen(false)} onSubmit={handlePasteSubmit} />}
 
-      <h2>Documents</h2>
-      {documents.length === 0 && <p>No documents yet.</p>}
-      <ul>
-        {documents.map((doc) => (
-          <li key={doc.id}>
-            {renamingId === doc.id ? (
-              <>
-                <input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} />
-                <button onClick={() => commitRename(doc.id)}>Save</button>
-                <button onClick={() => setRenamingId(null)}>Cancel</button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => onOpenDocument(doc.id)}>
-                  {doc.title}
-                  {doc.sourceType === 'pdf' ? ' (PDF)' : ''}
-                </button>
-                <button onClick={() => startRename(doc)}>Rename</button>
-                <button onClick={() => handleDelete(doc.id)}>Delete</button>
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
+      {renamingDoc && (
+        <RenameDialog
+          initialTitle={renamingDoc.title}
+          onClose={() => setRenamingDoc(null)}
+          onSubmit={handleRenameSubmit}
+        />
+      )}
+
+      {deletingDoc && (
+        <ConfirmDialog
+          title="Delete document"
+          message={`Delete "${deletingDoc.title}"? This cannot be undone.`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeletingDoc(null)}
+        />
+      )}
+    </AppShell>
   );
 }

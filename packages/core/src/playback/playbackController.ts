@@ -1,4 +1,5 @@
 import type { DocumentStructure, ReadingCursor, WordRef } from '../model/types';
+import { buildChunkFromWord, DEFAULT_CHUNK_TARGET_CHARS } from './chunking';
 import { computeProgress, findWordAtOrBeforeOffset, findWordIndexAtOrAfterOffset } from './cursorMath';
 import type { TTSEngine, VoiceInfo } from './ttsEngine';
 
@@ -7,12 +8,33 @@ export type PlaybackState = 'idle' | 'playing' | 'paused';
 const MIN_RATE = 0.5;
 const MAX_RATE = 3;
 
+// How many chunks ahead to offer engines as a generation hint (see
+// SpeakOptions.lookaheadTexts). Chunks are now large enough (~900 chars,
+// easily tens of seconds of audio) that a single chunk of lookahead gives
+// Kokoro's WASM inference comfortably more lead time than its own generation
+// takes, even on a CPU with no GPU acceleration — unlike the old
+// one-sentence-per-chunk design, where a single sentence of buffer wasn't
+// enough lead time and every boundary stalled regardless of how early the
+// lookahead started.
+const LOOKAHEAD_CHUNK_COUNT = 1;
+
 export interface PlaybackControllerOptions {
   documentId: string;
   structure: DocumentStructure;
+  // The document's full raw text (same string segmentText(text) was built
+  // from — see ARCHITECTURE.md's TTS chunking note). Needed so a chunk
+  // spanning multiple sentences can be sliced directly by char offset rather
+  // than reassembled from individual SentenceRef.text fragments, which would
+  // lose whatever separated them (a paragraph break, or a segment
+  // Intl.Segmenter produced but segmentText discarded as whitespace-only).
+  documentText: string;
   initialCursor: ReadingCursor;
   initialVoiceURI: string | null;
   initialRate: number;
+  // Overrides DEFAULT_CHUNK_TARGET_CHARS — exposed so tests can force
+  // one-sentence-per-chunk granularity deterministically instead of relying
+  // on short test fixtures to stay under the real default.
+  chunkTargetChars?: number;
   ttsEngine: TTSEngine;
   persistCursor: (cursor: ReadingCursor) => void | Promise<void>;
   persistSettings: (settings: { selectedVoiceURI: string | null; playbackSpeed: number }) => void | Promise<void>;
@@ -25,11 +47,14 @@ export interface PlaybackControllerOptions {
 
 // The logical reading cursor is the source of truth for playback position —
 // never the TTS engine's internal state (see ARCHITECTURE.md §6). This class
-// owns that cursor and drives an injected TTSEngine one sentence at a time;
-// it never reads speechSynthesis.paused/.pending/.speaking.
+// owns that cursor and drives an injected TTSEngine one multi-sentence chunk
+// at a time (see chunking.ts's buildChunkFromWord); it never reads
+// speechSynthesis.paused/.pending/.speaking.
 export class PlaybackController {
   private readonly documentId: string;
   private readonly structure: DocumentStructure;
+  private readonly documentText: string;
+  private readonly chunkTargetChars: number;
   private readonly ttsEngine: TTSEngine;
   private readonly persistCursorFn: PlaybackControllerOptions['persistCursor'];
   private readonly persistSettingsFn: PlaybackControllerOptions['persistSettings'];
@@ -51,6 +76,8 @@ export class PlaybackController {
   constructor(opts: PlaybackControllerOptions) {
     this.documentId = opts.documentId;
     this.structure = opts.structure;
+    this.documentText = opts.documentText;
+    this.chunkTargetChars = opts.chunkTargetChars ?? DEFAULT_CHUNK_TARGET_CHARS;
     this.cursor = opts.initialCursor;
     this.voiceURI = opts.initialVoiceURI;
     this.rate = clampRate(opts.initialRate);
@@ -196,14 +223,24 @@ export class PlaybackController {
   }
 
   private speakFrom(word: WordRef): void {
-    const sentence = this.structure.sentences[word.sentenceIndex];
-    if (!sentence) return;
-
-    const localOffset = word.charStart - sentence.charStart;
-    const text = sentence.text.slice(localOffset);
-    const sentenceWords = this.wordsBySentence.get(word.sentenceIndex) ?? [word];
+    const chunk = buildChunkFromWord(this.structure, this.documentText, this.wordsBySentence, word, this.chunkTargetChars);
     const baseOffset = word.charStart;
-    const sentenceIndex = word.sentenceIndex;
+
+    // Peek at the next chunk(s) (without moving the cursor there) so engines
+    // that need to render a whole utterance before playing any of it can
+    // start on them now, overlapping generation with this chunk's playback
+    // instead of only starting once onEnd fires. See LOOKAHEAD_CHUNK_COUNT.
+    const lookaheadTexts: string[] = [];
+    let lookaheadSentenceCursor = chunk.lastSentenceIndex;
+    for (let i = 0; i < LOOKAHEAD_CHUNK_COUNT; i++) {
+      const next = this.findSentenceWithWords(lookaheadSentenceCursor + 1, 1);
+      if (next === null) break;
+      const nextWord = this.structure.words[this.sentenceFirstWordIndex[next] as number];
+      if (!nextWord) break;
+      const lookaheadChunk = buildChunkFromWord(this.structure, this.documentText, this.wordsBySentence, nextWord, this.chunkTargetChars);
+      lookaheadTexts.push(lookaheadChunk.text);
+      lookaheadSentenceCursor = lookaheadChunk.lastSentenceIndex;
+    }
 
     // Every speak() call gets a generation number. Calling ttsEngine.cancel()
     // (from pause/stop/seek/setSpeed/setVoice) reliably stops audio, but
@@ -216,13 +253,15 @@ export class PlaybackController {
     // ignored outright.
     this.utteranceGeneration += 1;
     const generation = this.utteranceGeneration;
+    const lastSentenceIndex = chunk.lastSentenceIndex;
 
-    this.ttsEngine.speak(text, {
+    this.ttsEngine.speak(chunk.text, {
       voiceURI: this.voiceURI,
       rate: this.rate,
+      lookaheadTexts,
       onWordBoundary: (charIndex, confirmed) =>
-        this.handleBoundary(charIndex, confirmed, baseOffset, sentenceWords, generation),
-      onEnd: () => this.handleUtteranceEnd(sentenceIndex, generation),
+        this.handleBoundary(charIndex, confirmed, baseOffset, chunk.chunkWords, generation),
+      onEnd: () => this.handleUtteranceEnd(lastSentenceIndex, generation),
       onError: (error) => this.handleUtteranceError(error, generation),
     });
   }
@@ -231,13 +270,13 @@ export class PlaybackController {
     charIndexInUtterance: number,
     confirmed: boolean,
     baseOffset: number,
-    sentenceWords: WordRef[],
+    chunkWords: WordRef[],
     generation: number,
   ): void {
     if (generation !== this.utteranceGeneration) return; // stale/superseded utterance
 
     const globalOffset = baseOffset + charIndexInUtterance;
-    const word = findWordAtOrBeforeOffset(sentenceWords, globalOffset);
+    const word = findWordAtOrBeforeOffset(chunkWords, globalOffset);
     if (!word) return;
 
     if (confirmed) {
@@ -260,14 +299,16 @@ export class PlaybackController {
     this.onPersistError?.(error);
   }
 
-  private handleUtteranceEnd(finishedSentenceIndex: number, generation: number): void {
+  // `finishedLastSentenceIndex` is the chunk's *last* sentence, not
+  // necessarily the one speakFrom() started at — a chunk groups several.
+  private handleUtteranceEnd(finishedLastSentenceIndex: number, generation: number): void {
     if (generation !== this.utteranceGeneration) return; // stale/superseded utterance
     // Also guards the (much rarer) race where a legitimate onEnd for the
     // current utterance arrives just after pause()/stop() already changed
     // state — without this, it would incorrectly resume playback.
     if (this.state !== 'playing') return;
 
-    const nextSentence = this.findSentenceWithWords(finishedSentenceIndex + 1, 1);
+    const nextSentence = this.findSentenceWithWords(finishedLastSentenceIndex + 1, 1);
     if (nextSentence === null) {
       // Document finished. Cursor already sits on the last confirmed word.
       this.state = 'idle';

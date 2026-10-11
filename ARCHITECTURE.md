@@ -2,6 +2,7 @@
 
 Offline-first PDF/text reading app with local TTS, shared across Web (PWA) and Android (Capacitor).
 Personal use only. No backend, no accounts, no analytics, no network dependency for core function.
+One named exception: the optional "Aria" voice depends on a small external proxy — see §7a.
 
 Status: **Phase 0 (scaffold), Phase 1 (document model + storage + text library), Phase 2 (PDF extraction), and Phase 3 (web TTS playback + word-level sync) implemented.**
 
@@ -46,6 +47,8 @@ Project_Lingxi/                # project root
         ui/                    # reading view, library, controls
     android/                   # Capacitor project, webDir -> apps/web/dist
       android/                 # native Kotlin: TTS foreground service, plugin
+    tts-proxy/                 # Node/Render proxy — Aria voice only, see §7a
+      src/
 ```
 
 `packages/core` has zero platform dependencies (no `window`, no `speechSynthesis`, no Capacitor
@@ -213,16 +216,29 @@ be unreliable across browsers/voices (Chrome in particular has long-standing bug
 fails after a delay). Rather than build pause/resume logic on top of a flaky primitive, `PlaybackController`
 (in `packages/core`) never uses it:
 
-- **Utterances are sentence-sized**, not whole-document. `PlaybackController` feeds `TTSEngine.speak()`
-  one sentence at a time.
+- **Utterances are multi-sentence chunks**, not whole-document and not single-sentence either.
+  `PlaybackController.buildChunk()` groups consecutive sentences up to ~900 chars (never splitting a
+  sentence mid-way) and feeds the whole chunk to `TTSEngine.speak()` in one call. This replaced an
+  earlier one-sentence-per-`speak()` design: synthesizing and playing each sentence as its own utterance
+  gave every sentence end its own playback start/stop, audible as a gap at every single sentence
+  boundary (and, before PDF text got a `normalizeLineWraps` pass — see §7a's sibling note in
+  `segmentText.ts` — at every wrapped PDF *line* too, since `Intl.Segmenter`'s sentence boundary rules
+  treat a bare `\n` as an unconditional break). Chunking removes that gap while still never crossing a
+  real sentence boundary mid-word.
 - **Pause** = record the cursor at the last confirmed word boundary, then `TTSEngine.cancel()` (a hard,
-  reliable stop). The rest of the in-flight sentence's audio is simply discarded — acceptable since a
-  sentence is a few seconds at most.
-- **Resume** = build a new utterance from `structure.sentences[cursor.sentenceIndex]`, sliced starting at
-  `cursor.wordIndex`'s `charStart`, and call `speak()` again. From the browser's perspective this is a
-  brand new utterance, not a resumed one — sidestepping the buggy primitive entirely.
-- **Next/Previous chunk** = cancel current utterance, move cursor to the adjacent sentence's first word,
-  speak.
+  reliable stop). The rest of the in-flight chunk's audio is simply discarded and re-synthesized on
+  resume — acceptable since pausing mid-chunk is rare relative to how often playback just runs to a
+  chunk's natural end, and `CachingTTSEngine`'s segment cache (§8a) means a chunk already heard once
+  doesn't hit the network or re-run inference again regardless.
+- **Resume** = build a new chunk starting at `cursor.wordIndex`'s `charStart` (via `buildChunk`, sliced
+  directly from the document's full text — see `PlaybackControllerOptions.documentText`) and call
+  `speak()` again. From the browser's perspective this is a brand new utterance, not a resumed one —
+  sidestepping the buggy primitive entirely.
+- **Next/Previous sentence** (the UI's skip controls) still operate at single-sentence granularity:
+  cancel current utterance, move cursor to the adjacent sentence's first word, speak — which then builds
+  a *fresh* chunk starting there. Only the normal "chunk finishes, advance to the next one" path and the
+  manual skip controls differ in granularity; cursor/highlighting resolution (`handleBoundary`) is
+  chunk-aware either way, via word offsets collected across every sentence the chunk spans.
 - **Click any word to start reading from there** = cancel, set cursor to that word (mid-sentence
   allowed — slice the sentence text from that word forward), speak.
 - **Click progress bar** = map click position to a global char offset → nearest word → same as above.
@@ -230,6 +246,75 @@ fails after a delay). Rather than build pause/resume logic on top of a flaky pri
 `PlaybackController` is a plain TS state machine (`idle | playing | paused`) driven by these cursor
 operations; it holds no reference to `speechSynthesis` directly, only to whatever `TTSEngine` it's given
 — identical logic drives both the web and Android adapters.
+
+---
+
+## 7a. Aria (Edge TTS) voice — the one deliberate online exception
+
+Everything else in this document (§0's framing line included) describes an offline-first app with
+**no backend**. The `edge:en-US-AriaNeural` voice (Microsoft's "Aria" neural voice, via Edge's online
+TTS service) is a single, deliberate, opt-in exception to that rule — named here explicitly rather than
+left as a silent contradiction.
+
+**Why it needs a backend at all.** Microsoft's Edge TTS WebSocket endpoint checks the connecting
+request's `Origin` header against the real Edge browser's own built-in "Read Aloud" extension. A
+browser's `WebSocket` implementation always sends the page's true `Origin` and gives page JS no way to
+override it — in *any* browser, not just non-Edge ones. This was confirmed empirically, not assumed:
+two independent, actively-maintained client libraries were tried directly from browser JS, including one
+with a verified-valid auth token (its plain HTTPS voice-list call succeeded with real data using that
+exact token) — the WebSocket still closed immediately in both cases. No client-side fix exists.
+
+**The proxy.** `apps/tts-proxy` is a minimal plain-Node HTTP server (`POST /api/tts`, `{ text, voice, rate }`
+→ `{ audio, words, durationMs }`) that performs the same WebSocket handshake server-side, where the
+`Origin` header can be set freely — this is the only thing that makes Aria reachable at all. It is
+unauthenticated, keeps no state beyond a best-effort in-memory rate limit, and knows nothing about
+Lingxi's documents or users: it is a narrow text-to-speech relay, not a general backend. `EdgeTTSEngine`
+(`apps/web/src/tts/edge/`) calls it over plain HTTPS `fetch` — an ordinary cross-origin request, none of
+the Origin/WebSocket restrictions above apply to that leg. It uses Node's `ws` package specifically
+because — unlike a browser's `WebSocket` — it lets server code set arbitrary headers (`Origin`,
+`User-Agent`, `Sec-WebSocket-Protocol`) on the outgoing handshake; this is what makes the whole proxy
+possible server-side at all.
+
+**What this does *not* change.** Every other voice (Kokoro, browser/Web Speech voices) and all core
+functionality — reading, library, PDF import, progress persistence — works fully offline, exactly as
+described elsewhere in this document. Aria is additive and optional: pick a different voice, and Lingxi
+never makes a network call it doesn't already make for other online browser voices (§3). No account, no
+sign-up, no data about what you're reading is sent to the proxy beyond the one sentence being spoken at
+that moment.
+
+**Word timing.** Unlike the first version of this proxy, `wordBoundaryEnabled` is now turned on in the
+request to Microsoft's service, and the proxy parses the resulting `Path:audio.metadata` messages into
+real per-word `{ offsetMs, durationMs, text }` anchors, returned alongside the audio. `EdgeTTSEngine`
+passes these straight through to the shared player, so Aria's word highlighting is `confirmed: true`,
+the same real-boundary category as Web Speech's native `boundary` events — not the `confirmed: false`
+time-based estimate Kokoro uses (§8).
+
+**Deployment.** `EdgeTTSEngine`'s default proxy URL points at a permanent deployment on Render
+(`lingxi-tts-proxy.onrender.com`), deployed from a GitHub repo containing just `apps/tts-proxy`
+(git-based deploy — Render has no raw CLI push). Set `VITE_TTS_PROXY_URL` to override with a different
+deployment if needed.
+
+**Why Render, not Cloudflare Workers.** The proxy was originally deployed as a Cloudflare Worker (using
+Workers' outbound-`fetch`-to-WebSocket trick to set the `Origin` header, since Workers' `fetch` allows
+headers a browser's `WebSocket` doesn't). That deployment reached a point where Microsoft's endpoint
+reliably rejected the WebSocket upgrade (`"Edge TTS upstream did not accept the WebSocket upgrade."`,
+HTTP 502) — while a *different* self-hosted comparison backend (not running on Workers) synthesized the
+exact same voice successfully at the same time, ruling out a general Microsoft-side outage. Direct
+verification (replaying the identical handshake — same `Origin`, same token derivation — via Node's
+`ws` package from a plain, non-Workers IP) succeeded instantly, while the Workers deployment kept
+failing. The conclusion: **Microsoft blocks or rate-limits Cloudflare Workers' egress IP ranges
+specifically**, not Workers' code or this proxy's logic. This is also why the comparison site's real
+backend is self-hosted and only *exposed* via a Cloudflare Tunnel, never run as Workers compute. The fix
+was moving the proxy to a normal persistent Node process (Render) with ordinary datacenter egress IPs —
+the Worker-specific code (`wrangler`, `src/index.ts`) was deleted rather than kept around as dead,
+misleadingly-deployable code.
+
+**Cold starts.** Render's free tier sleeps the service after ~15 min idle and takes 30-50s to wake on
+the next request. `EdgeTTSEngine.fetchAudio` surfaces this as an `ariaWakeTracker` pub/sub signal
+(`idle` → `waking` after 4s of a pending request, matching the same subscribe() shape as
+`KokoroStatusSnapshot`/`OfflineDownloadSnapshot`), which `PlaybackControls` renders as a "Waking up
+Aria…" note instead of a silent stall. This only ever affects the first segment after idle time — the
+look-ahead queue keeps playback smooth once the service is warm.
 
 ---
 
@@ -264,6 +349,64 @@ operations; it holds no reference to `speechSynthesis` directly, only to whateve
 
 ---
 
+## 8a. Document-session layer — segment cache, navigation, export
+
+A layer on top of everything in §7/§7a/§8 — it never touches the `TTSEngine`/`SpeakOptions` contract or
+the look-ahead pipeline, only wraps around it.
+
+**Segment cache.** `CachingTTSEngine` (`apps/web/src/tts/CachingTTSEngine.ts`) wraps the routing engine
+and is what `ttsEngineInstance.ts` actually exports as `ttsEngine`. Cache key is
+`hashText([text, voiceURI, String(rate)])` (`packages/core/src/cache/hash.ts`, SHA-256 via
+`crypto.subtle`) — **content-addressed, not document/segment identity**. This was a deliberate deviation
+from an earlier (documentHash, segmentIndex) design: engines only ever receive `text` + `SpeakOptions`,
+so keying any other way would have meant changing that shared interface. Content-addressing also means a
+re-uploaded/re-pasted document with identical text hits the cache for free, with no document-identity
+bookkeeping at all. Only `kokoro:`/`edge:` voices are cacheable — WebSpeech's `speechSynthesis` exposes no
+audio stream to capture, so browser voices are passed straight through, unchanged from before this layer
+existed. Kokoro's raw PCM is encoded to WAV at cache-write time (`apps/web/src/tts/wavEncoder.ts`,
+hand-rolled header, no dependency); Edge's MP3 is cached as-is. Playback of a cached entry (hit or
+freshly-generated) goes through one shared player, `apps/web/src/tts/playAudioSegment.ts`, which drives
+real `confirmed: true` word-boundary highlighting when `words` is non-empty (Edge/Aria, since the proxy
+now returns per-word timing — see §7a) or a fraction-based `confirmed: false` estimate otherwise (Kokoro).
+`OfflineDownloader` (`apps/web/src/tts/offlineDownload.ts`) walks a document's sentences calling the same
+`ensureCached()` the live playback miss-path uses, without playing anything — same
+status/progress/subscribe shape as `KokoroTTSEngine`'s model-download tracking, reusing its UI pattern.
+
+**Navigation.** `detectChapters()` (`packages/core/src/segmentation/detectChapters.ts`) is a conservative,
+line-anchored regex over capitalized "Chapter N"/"Part N" headers — deliberately not loose
+(case-insensitive "chapter" anywhere matches too much ordinary prose). Falls back to one TOC entry per
+PDF page (`doc.structure.pages`, already in the model) when zero chapters are detected, so the sidebar is
+never empty for a document with real page boundaries. In-document search is a plain case-insensitive
+substring scan over the already-in-memory document text — no index. Both TOC clicks and search
+next/prev/click-a-hit resolve a target char offset to a word index via the existing
+`findWordIndexAtOrAfterOffset` (`cursorMath.ts`) and call `PlaybackController.seekToWord()` — the exact
+same primitive a clicked word in the reading surface already used; no new jump mechanism was added.
+Search-match highlighting in `WordText.tsx` follows the same imperative DOM-class-toggle pattern (never
+React state) that playback highlighting already uses, for the same reason: re-rendering the word list on
+a document with hundreds of thousands of words is prohibitively slow (see §8's word-sync notes and the
+perf comment at the top of `WordText.tsx`).
+
+**Export.** `apps/web/src/export/exportAudio.ts` requires every sentence already cached (no on-the-fly
+synthesis) — `collectCachedSegments()` returns `null` if anything is missing, and the UI only shows the
+export buttons once it doesn't. If every cached segment is Edge/Aria (fixed-bitrate MP3, confirmed via
+`ffprobe` during development that raw concatenation produces a valid file), the segments are
+byte-concatenated directly into a real `.mp3`. Otherwise (any Kokoro segment present), every segment is
+decoded via `AudioContext.decodeAudioData` — which handles both the cached WAV and MP3 blobs uniformly —
+and re-encoded as one combined `.wav`; no document is ever blocked from exporting, the output format just
+adapts to what's actually in the cache. `exportSrt.ts` is gated further, on every cached segment being
+Aria specifically (only engine with real per-word timing): it concatenates each segment's word anchors in
+order, offsetting by that segment's cumulative duration so far, into standard SRT cues.
+
+**Known limitation:** the segment cache has no eviction or quota awareness — same deferred-and-documented
+posture as §0's dev-tooling vulnerabilities. A long book read in full, in multiple voices, could use
+meaningful IndexedDB space with nothing currently freeing it. `LibraryRepository.deleteDocument()`
+deliberately does **not** touch `segmentCache` — entries are content-addressed, not document-addressed
+(this section, above), so a cached segment can legitimately outlive the document it was first spoken
+from (a re-upload of the same text should still hit it). Revisit the no-eviction gap if it becomes a real
+problem in practice rather than a theoretical one.
+
+---
+
 ## 9. Local storage / database strategy
 
 Single IndexedDB database (`lingxi-db`), accessed via `idb` (tiny promise wrapper, not a query-engine
@@ -275,9 +418,14 @@ library like Dexie — keeps us close to the platform, minimal dependency surfac
 | `documentText` | `id` | full `text` string | Loaded only when a document is actually opened |
 | `cursors` | `documentId` | `ReadingCursor` + `PlaybackSettings` | Written far more frequently (every pause, periodically during play) than the document itself — isolating it keeps those writes cheap and avoids rewriting structure data on every pause |
 | `sourceFiles` | `documentId` | original PDF as a `Blob` (pdf documents only) | Large binary kept out of the frequently-read `documents`/`documentText` stores; only touched on import and on-demand "view original" |
+| `segmentCache` | content hash (§8a) | synthesized audio `Blob` + word anchors per (text, voice, rate) | Content-addressed, not document-addressed — deliberately keyed independently of `documents`/`documentText` so identical text hits the cache regardless of which document record it's attached to |
 
-No full-text search index — library search is an in-memory filter over already-loaded titles/filenames,
-adequate for a personal library and avoids a search dependency.
+`DB_VERSION` is 2 (`segmentCache` was the first real migration — `upgrade()` is now guarded on
+`oldVersion`, not unconditional `createObjectStore` calls, so upgrading an existing v1 database is safe).
+
+No full-text search index for the *library* — library search is an in-memory filter over already-loaded
+titles/filenames, adequate for a personal library and avoids a search dependency. (In-document search,
+§8a, is separate: a substring scan over one already-loaded document's text, not an index either.)
 
 ---
 
@@ -356,6 +504,9 @@ This is genuine native Kotlin work, scoped entirely to the Android implementatio
   - PDF pipeline against fixture PDFs: normal text PDF, malformed/corrupt PDF, scanned/image-only PDF,
     empty PDF
   - long-document fixture (large generated text) for chunking correctness/performance
+  - `SegmentCacheRepository` get/put round-trips and the v1→v2 `DB_VERSION` migration (§8a/§9)
+  - `detectChapters()` against fixture texts, including deliberate false-positive checks (ordinary prose
+    that happens to contain "chapter" shouldn't match)
 - **Playwright** (already used elsewhere in this workspace, no new dependency) for the end-to-end
   critical path in `apps/web`:
   1. import/paste a document

@@ -1,0 +1,162 @@
+/* ---------- App shell ---------- */
+
+.app-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topbar-start,
+.topbar-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.brand-mark {
+  color: var(--accent);
+}
+
+.topbar-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- Modal ---------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 13, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 100;
+}
+
+.modal-panel {
+  width: 100%;
+  max-width: 30rem;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.modal-body-text {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+
+/* ---------- Overflow menu / dropdown ---------- */
+
+.menu-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-2));
+  min-width: 12rem;
+  padding: var(--space-2);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--surface-sunken);
+}
+
+.menu-item.danger {
+  color: var(--danger);
+}
+
+.menu-item.danger:hover {
+  background: var(--danger-soft);
+}
+
+/* ---------- Alerts / status text ---------- */
+
+.status-message {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.error-message {
+  font-size: var(--font-size-sm);
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}

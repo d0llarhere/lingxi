@@ -10,5 +10,14 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "dev:web": "npm run dev --workspace apps/web"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true,
+    "esbuild@0.28.2": true,
+    "sharp@0.35.5": true,
+    "sharp@0.34.5": true,
+    "onnxruntime-node@1.21.0": true,
+    "protobufjs@7.6.6": true,
+    "workerd@1.20261006.1": true
   }
 }

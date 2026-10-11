@@ -24,7 +24,7 @@ export function segmentText(text: string, pages?: PageRef[]): DocumentStructure 
       const globalPEnd = page.charStart + pEnd;
       paragraphs.push({ index: paragraphIndex, pageIndex: page.index, charStart: globalPStart, charEnd: globalPEnd });
 
-      const paragraphText = text.slice(globalPStart, globalPEnd);
+      const paragraphText = normalizeLineWraps(text.slice(globalPStart, globalPEnd));
       for (const seg of sentenceSegmenter.segment(paragraphText)) {
         if (seg.segment.trim().length === 0) continue;
 
@@ -77,4 +77,21 @@ function splitParagraphRanges(text: string): Array<[number, number]> {
 
 function pushRange(ranges: Array<[number, number]>, start: number, end: number) {
   if (end > start) ranges.push([start, end]);
+}
+
+// pdf.js/pdftotext-style extraction emits one bare \n per *visual* line
+// (buildPageText's hasEOL), not per paragraph — real paragraph breaks are the
+// \n{2,} runs splitParagraphRanges already strips out above. Left in place, a
+// lone \n is still a hard sentence break to Intl.Segmenter: UAX #29's SB4
+// rule treats any line-feed as an unconditional sentence boundary regardless
+// of punctuation, which fragments every wrapped PDF line into its own
+// "sentence" (and, one layer up, its own TTS utterance with an audible gap).
+// Replacing a run of exactly one \n with a space collapses the wrap without
+// touching any other character's position — length-preserving, so every
+// charStart/charEnd computed downstream still indexes the exact same
+// position in the original text. Runs of 2+ (true paragraph breaks) are
+// left untouched as a defensive no-op; by this point splitParagraphRanges
+// has already excluded them from paragraphText entirely.
+export function normalizeLineWraps(text: string): string {
+  return text.replace(/\n+/g, (run) => (run.length === 1 ? ' ' : run));
 }

@@ -1,12 +1,26 @@
 import type { PlaybackState, VoiceInfo } from '@lingxi/core';
+import { DownloadIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, StopIcon } from '../components/icons';
+import { EDGE_VOICE_PREFIX, EDGE_VOICES, type AriaWakeStatus } from '../tts/edge/EdgeTTSEngine';
+import type { KokoroStatusSnapshot } from '../tts/kokoro/KokoroTTSEngine';
+import { KOKORO_VOICE_PREFIX, KOKORO_VOICES } from '../tts/kokoro/KokoroTTSEngine';
+import type { OfflineDownloadSnapshot } from '../tts/offlineDownload';
+
+const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 1.75, 2];
 
 interface PlaybackControlsProps {
   state: PlaybackState;
   progress: number;
   rate: number;
   voices: VoiceInfo[];
+  voicesLoading: boolean;
   voiceURI: string | null;
+  kokoroStatus: KokoroStatusSnapshot;
+  offlineDownloadStatus: OfflineDownloadSnapshot;
+  ariaWakeStatus: AriaWakeStatus;
+  cacheStatus: { fullyCached: boolean; allAria: boolean } | null;
   approximateHighlighting: boolean;
+  currentPage: number | null;
+  totalPages: number;
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
@@ -14,6 +28,10 @@ interface PlaybackControlsProps {
   onNext: () => void;
   onRateChange: (rate: number) => void;
   onVoiceChange: (voiceURI: string | null) => void;
+  onDownloadKokoro: () => void;
+  onDownloadOffline: () => void;
+  onExportAudio: () => void;
+  onExportSrt: () => void;
   onSeek: (fraction: number) => void;
 }
 
@@ -22,8 +40,15 @@ export function PlaybackControls({
   progress,
   rate,
   voices,
+  voicesLoading,
   voiceURI,
+  kokoroStatus,
+  offlineDownloadStatus,
+  ariaWakeStatus,
+  cacheStatus,
   approximateHighlighting,
+  currentPage,
+  totalPages,
   onPlay,
   onPause,
   onStop,
@@ -31,26 +56,37 @@ export function PlaybackControls({
   onNext,
   onRateChange,
   onVoiceChange,
+  onDownloadKokoro,
+  onDownloadOffline,
+  onExportAudio,
+  onExportSrt,
   onSeek,
 }: PlaybackControlsProps) {
-  return (
-    <div>
-      <div>
-        <button onClick={onPrevious}>Previous sentence</button>
-        <button onClick={onPlay} disabled={state === 'playing'}>
-          {state === 'paused' ? 'Resume' : 'Play'}
-        </button>
-        <button onClick={onPause} disabled={state !== 'playing'}>
-          Pause
-        </button>
-        <button onClick={onStop} disabled={state === 'idle'}>
-          Stop
-        </button>
-        <button onClick={onNext}>Next sentence</button>
-      </div>
+  const percent = Math.round(progress * 100);
+  const isPlaying = state === 'playing';
+  const browserVoices = voices.filter(
+    (voice) => !voice.voiceURI.startsWith(KOKORO_VOICE_PREFIX) && !voice.voiceURI.startsWith(EDGE_VOICE_PREFIX),
+  );
+  const isKokoroSelected = voiceURI?.startsWith(KOKORO_VOICE_PREFIX) ?? false;
+  const isAriaSelected = voiceURI?.startsWith(EDGE_VOICE_PREFIX) ?? false;
+  // Only kokoro:/edge: voices can be cached at all — WebSpeech exposes no
+  // audio stream to capture (see CachingTTSEngine.ts).
+  const isCacheableVoice = isKokoroSelected || isAriaSelected;
 
-      <div>
-        <label htmlFor="progress-bar">Progress</label>
+  return (
+    <div className="playback-bar">
+      {isAriaSelected && ariaWakeStatus === 'waking' && (
+        <p className="approximate-note">Waking up Aria… the server went idle and takes up to a minute to start.</p>
+      )}
+
+      {approximateHighlighting && (
+        <p className="approximate-note">Word highlighting is approximate on this browser/voice.</p>
+      )}
+
+      <div className="playback-progress-row">
+        <label className="visually-hidden" htmlFor="progress-bar">
+          Reading progress
+        </label>
         <input
           id="progress-bar"
           type="range"
@@ -60,35 +96,161 @@ export function PlaybackControls({
           value={progress}
           onChange={(e) => onSeek(Number(e.target.value))}
         />
+        <span className="playback-progress-label">
+          {percent}%{currentPage && totalPages > 1 ? ` · p.${currentPage}/${totalPages}` : ''}
+        </span>
       </div>
 
-      <div>
-        <label htmlFor="speed-control">Speed: {rate.toFixed(1)}x</label>
-        <input
-          id="speed-control"
-          type="range"
-          min={0.5}
-          max={3}
-          step={0.1}
-          value={rate}
-          onChange={(e) => onRateChange(Number(e.target.value))}
-        />
+      <div className="playback-controls-row">
+        <div className="playback-transport">
+          <button type="button" className="btn btn-icon" onClick={onPrevious} aria-label="Previous sentence">
+            <PreviousIcon />
+          </button>
+          <button
+            type="button"
+            className="btn btn-play"
+            onClick={isPlaying ? onPause : onPlay}
+            aria-label={isPlaying ? 'Pause' : state === 'paused' ? 'Resume' : 'Play'}
+          >
+            {isPlaying ? <PauseIcon /> : <PlayIcon />}
+          </button>
+          <button type="button" className="btn btn-icon" onClick={onNext} aria-label="Next sentence">
+            <NextIcon />
+          </button>
+          <button
+            type="button"
+            className="btn btn-icon"
+            onClick={onStop}
+            disabled={state === 'idle'}
+            aria-label="Stop"
+          >
+            <StopIcon />
+          </button>
+        </div>
+
+        <div className="playback-secondary">
+          <div className="speed-control" role="group" aria-label="Playback speed">
+            {SPEED_OPTIONS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={`speed-option${rate === option ? ' is-active' : ''}`}
+                onClick={() => onRateChange(option)}
+              >
+                {option}x
+              </button>
+            ))}
+          </div>
+
+          <select
+            className="select voice-select"
+            aria-label="Voice"
+            value={voiceURI ?? ''}
+            disabled={voicesLoading}
+            onChange={(e) => onVoiceChange(e.target.value || null)}
+          >
+            <option value="">Default voice</option>
+            {voicesLoading && <option disabled>Loading voices…</option>}
+            <optgroup label="Local voices (offline)">
+              {KOKORO_VOICES.map((voice) => (
+                <option key={voice.voiceURI} value={voice.voiceURI}>
+                  {voice.name}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Premium voices (online)">
+              {EDGE_VOICES.map((voice) => (
+                <option key={voice.voiceURI} value={voice.voiceURI}>
+                  {voice.name} ({voice.lang}) · requires network
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Browser voices">
+              {browserVoices.map((voice) => (
+                <option key={voice.voiceURI} value={voice.voiceURI}>
+                  {voice.name} ({voice.lang}){voice.localService ? '' : ' · requires network'}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+        </div>
       </div>
 
-      <div>
-        <label htmlFor="voice-select">Voice</label>
-        <select id="voice-select" value={voiceURI ?? ''} onChange={(e) => onVoiceChange(e.target.value || null)}>
-          <option value="">Default</option>
-          {voices.map((voice) => (
-            <option key={voice.voiceURI} value={voice.voiceURI}>
-              {voice.name} ({voice.lang})
-            </option>
-          ))}
-        </select>
-      </div>
+      {(isKokoroSelected || kokoroStatus.status === 'downloading' || kokoroStatus.status === 'error') && (
+        <div className="local-voice-status">
+          {kokoroStatus.status === 'ready' && <span className="local-voice-status-ok">✓ Local voice ready (offline)</span>}
 
-      {approximateHighlighting && (
-        <p>Word highlighting is approximate on this browser/voice (no word-boundary events available).</p>
+          {kokoroStatus.status === 'not-downloaded' && (
+            <>
+              <span>Local voice model not downloaded yet</span>
+              <button type="button" className="btn" onClick={onDownloadKokoro}>
+                Download Kokoro
+              </button>
+            </>
+          )}
+
+          {kokoroStatus.status === 'downloading' && (
+            <>
+              <span>Downloading local voice model… {Math.round(kokoroStatus.progress * 100)}%</span>
+              <progress className="local-voice-progress" value={kokoroStatus.progress} max={1} />
+            </>
+          )}
+
+          {kokoroStatus.status === 'error' && (
+            <>
+              <span className="error-message">Download failed: {kokoroStatus.error}</span>
+              <button type="button" className="btn" onClick={onDownloadKokoro}>
+                Retry
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {isCacheableVoice && (
+        <div className="local-voice-status">
+          {offlineDownloadStatus.status === 'ready' && (
+            <span className="local-voice-status-ok">✓ Downloaded for offline playback</span>
+          )}
+
+          {offlineDownloadStatus.status === 'not-started' && (
+            <>
+              <span>Not yet downloaded for offline playback</span>
+              <button type="button" className="btn" onClick={onDownloadOffline}>
+                <DownloadIcon /> Download for offline
+              </button>
+            </>
+          )}
+
+          {offlineDownloadStatus.status === 'downloading' && (
+            <>
+              <span>Downloading for offline… {Math.round(offlineDownloadStatus.progress * 100)}%</span>
+              <progress className="local-voice-progress" value={offlineDownloadStatus.progress} max={1} />
+            </>
+          )}
+
+          {offlineDownloadStatus.status === 'error' && (
+            <>
+              <span className="error-message">Download failed: {offlineDownloadStatus.error}</span>
+              <button type="button" className="btn" onClick={onDownloadOffline}>
+                Retry
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {isCacheableVoice && cacheStatus?.fullyCached && (
+        <div className="local-voice-status">
+          <button type="button" className="btn btn-secondary" onClick={onExportAudio}>
+            <DownloadIcon /> Export {cacheStatus.allAria ? 'MP3' : 'WAV'}
+          </button>
+          {cacheStatus.allAria && (
+            <button type="button" className="btn btn-secondary" onClick={onExportSrt}>
+              <DownloadIcon /> Export subtitles (.srt)
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

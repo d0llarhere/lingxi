@@ -1,0 +1,129 @@
+/* Design tokens — the only place color/spacing/type values are defined.
+   Components reference these variables; they never hard-code values. */
+
+:root {
+  color-scheme: light;
+
+  /* Color — light (default) */
+  --background: #faf8f4;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-sunken: #f2efe9;
+  --text-primary: #211f1c;
+  --text-secondary: #6b6459;
+  --text-tertiary: #948d80;
+  --border: #e6e1d6;
+  --border-strong: #d3ccbc;
+  --accent: #3f6657;
+  --accent-hover: #325146;
+  --accent-soft: #e4ede9;
+  --accent-contrast: #ffffff;
+  --highlight: #ffe58f;
+  --highlight-text: #211f1c;
+  --danger: #a8433a;
+  --danger-hover: #8c362e;
+  --danger-soft: #f6e6e4;
+  --focus-ring: 0 0 0 3px rgba(63, 102, 87, 0.35);
+
+  --shadow-sm: 0 1px 2px rgba(33, 31, 28, 0.06);
+  --shadow-md: 0 6px 16px rgba(33, 31, 28, 0.08);
+  --shadow-lg: 0 16px 40px rgba(33, 31, 28, 0.14);
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  /* Typography */
+  --font-ui: -apple-system, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
+  --font-reading: Georgia, "Iowan Old Style", "Palatino Linotype", "Charter", serif;
+  --font-size-xs: 0.8125rem;
+  --font-size-sm: 0.9375rem;
+  --font-size-base: 1rem;
+  --font-size-md: 1.125rem;
+  --font-size-lg: 1.375rem;
+  --font-size-xl: 1.75rem;
+  --font-size-2xl: 2.125rem;
+  --reading-font-size: 1.25rem;
+  --reading-line-height: 1.8;
+  --reading-max-width: 40rem;
+
+  --transition-fast: 120ms ease;
+  --transition-base: 200ms ease;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --background: #16181a;
+  --surface: #1d2022;
+  --surface-elevated: #24282b;
+  --surface-sunken: #101213;
+  --text-primary: #eae7e0;
+  --text-secondary: #a9a49a;
+  --text-tertiary: #7d7970;
+  --border: #33373a;
+  --border-strong: #454a4d;
+  --accent: #7fbfa5;
+  --accent-hover: #98d0b8;
+  --accent-soft: #22322c;
+  --accent-contrast: #0d1512;
+  --highlight: #4d3f17;
+  --highlight-text: #ffdf8a;
+  --danger: #e18f87;
+  --danger-hover: #eaa9a3;
+  --danger-soft: #3a2422;
+  --focus-ring: 0 0 0 3px rgba(127, 191, 165, 0.4);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --background: #16181a;
+    --surface: #1d2022;
+    --surface-elevated: #24282b;
+    --surface-sunken: #101213;
+    --text-primary: #eae7e0;
+    --text-secondary: #a9a49a;
+    --text-tertiary: #7d7970;
+    --border: #33373a;
+    --border-strong: #454a4d;
+    --accent: #7fbfa5;
+    --accent-hover: #98d0b8;
+    --accent-soft: #22322c;
+    --accent-contrast: #0d1512;
+    --highlight: #4d3f17;
+    --highlight-text: #ffdf8a;
+    --danger: #e18f87;
+    --danger-hover: #eaa9a3;
+    --danger-soft: #3a2422;
+    --focus-ring: 0 0 0 3px rgba(127, 191, 165, 0.4);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms;
+    --transition-base: 0ms;
+  }
+}

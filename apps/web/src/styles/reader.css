@@ -1,0 +1,334 @@
+/* Row: optional TocSidebar (docked, not floating) + the reading column. */
+.reader-layout {
+  display: flex;
+  align-items: stretch;
+  min-height: calc(100vh - 65px);
+}
+
+.reader-page {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.reading-surface {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-8) var(--space-5) var(--space-7);
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reading-surface {
+    scroll-behavior: auto;
+  }
+}
+
+.reading-column {
+  max-width: var(--reading-max-width);
+  margin: 0 auto;
+  font-family: var(--font-reading);
+  font-size: var(--reading-font-size);
+  line-height: var(--reading-line-height);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+.reading-paragraph {
+  margin: 0 0 1em;
+  /* Lets the browser skip layout/paint/style work entirely for paragraphs
+     far outside the viewport, instead of always doing it for the whole
+     document. This matters for any *global* style change on a huge document
+     (e.g. toggling dark mode) — with ~185k words in one flat, unbroken flow,
+     a single :root color-variable change was measured forcing ~500ms of
+     style recalculation across every node, all at once, on click. Breaking
+     the flow into per-paragraph blocks lets that cost apply only to the
+     handful of paragraphs actually near-screen. contain-intrinsic-size gives
+     the browser a placeholder height for off-screen paragraphs so scrollbar
+     position/scrollIntoView stay accurate before they've ever been measured. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
+}
+
+.reading-word {
+  border-radius: 4px;
+  padding: 0.03em 0.05em;
+  margin: -0.03em -0.05em;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.reading-word:hover {
+  background: var(--surface-sunken);
+}
+
+.reading-word.is-active {
+  /* Deliberately no font-weight/font-size/letter-spacing change here: those
+     alter glyph metrics and force a real layout reflow on toggle. With the
+     full document's word list rendered unvirtualized (hundreds of thousands
+     of spans for a long book), that reflow cost compounds on every single
+     highlight tick during playback (measured: ~50-90% of playback time spent
+     in main-thread long tasks on a 184k-word document) and was the dominant
+     remaining cause of the highlight visibly lagging behind the audio.
+     background/color/box-shadow are paint-only — no reflow. */
+  background: var(--highlight);
+  color: var(--highlight-text);
+  box-shadow: 0 0 0 1px var(--highlight);
+}
+
+/* Search matches — same paint-only approach as .is-active above, for the
+   same reason (toggled on arbitrarily many words as the user types). */
+.reading-word.is-search-match {
+  background: var(--surface-sunken);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+.reading-word.is-active-match {
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.reading-empty-notice {
+  max-width: var(--reading-max-width);
+  margin: 0 auto;
+  color: var(--text-secondary);
+  font-size: var(--font-size-md);
+  text-align: center;
+  padding: var(--space-7) 0;
+}
+
+.approximate-note {
+  max-width: var(--reading-max-width);
+  margin: 0 auto var(--space-5);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+/* Playback bar */
+
+.playback-bar {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.playback-progress-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 48rem;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.playback-progress-row input[type='range'] {
+  flex: 1;
+}
+
+.playback-progress-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  min-width: 3rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.playback-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  max-width: 48rem;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.playback-transport {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.playback-secondary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.speed-control {
+  display: flex;
+  gap: 2px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+  padding: 2px;
+}
+
+.speed-option {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.speed-option:hover {
+  color: var(--text-primary);
+}
+
+/* Local (Kokoro) voice model status — the voice picker itself lives in the
+   voice <select>'s "Local voices (offline)" optgroup in PlaybackControls. */
+
+.local-voice-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  max-width: 48rem;
+  margin: 0 auto;
+  width: 100%;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.local-voice-status-ok {
+  color: var(--color-success, #3fae64);
+}
+
+.local-voice-progress {
+  width: 8rem;
+}
+
+.speed-option.is-active {
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.voice-select {
+  min-width: 10rem;
+  max-width: 14rem;
+}
+
+@media (max-width: 720px) {
+  .reading-surface {
+    padding: var(--space-6) var(--space-4) var(--space-5);
+  }
+
+  .reading-column {
+    font-size: 1.125rem;
+  }
+
+  .playback-controls-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .playback-transport {
+    justify-content: center;
+  }
+
+  .playback-secondary {
+    justify-content: center;
+  }
+}
+
+/* Table of contents sidebar */
+
+.toc-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 16rem;
+  flex-shrink: 0;
+  /* Docked flush against the reading column, not a floating card — flatten
+     the side/corners .card normally has. */
+  border-radius: 0;
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+  box-shadow: none;
+}
+
+.toc-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.toc-sidebar-title {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.toc-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toc-sidebar-item {
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.toc-sidebar-item.is-active {
+  background: var(--surface-sunken);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.toc-sidebar-empty {
+  padding: var(--space-3);
+}
+
+/* In-document search bar — docked above the reading surface. */
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.search-bar .library-search {
+  flex: 1;
+  max-width: 24rem;
+}
+
+.search-bar-count {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  min-width: 4.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .toc-sidebar {
+    position: fixed;
+    inset: 65px 0 0 0;
+    width: auto;
+    z-index: 15;
+  }
+}
