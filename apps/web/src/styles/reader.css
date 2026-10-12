@@ -140,26 +140,38 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Three columns so the transport cluster is centered on the row as a whole,
+   not just centered within whatever space is left after the secondary
+   controls — matches the time/transport/extras layout convention most media
+   players use. */
 .playback-controls-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-4);
-  flex-wrap: wrap;
   max-width: 48rem;
   margin: 0 auto;
   width: 100%;
 }
 
+.playback-time {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .playback-transport {
   display: flex;
   align-items: center;
+  justify-self: center;
   gap: var(--space-3);
 }
 
 .playback-secondary {
   display: flex;
   align-items: center;
+  justify-self: end;
   gap: var(--space-4);
   flex-wrap: wrap;
 }
@@ -234,8 +246,12 @@
   }
 
   .playback-controls-row {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .playback-time {
+    order: 3;
   }
 
   .playback-transport {

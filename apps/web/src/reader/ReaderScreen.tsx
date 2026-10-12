@@ -381,6 +381,7 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
   const { doc, text } = loaded;
   const totalPages = doc.structure.pages.length;
   const currentPage = totalPages > 1 ? currentPageIndex + 1 : null;
+  const totalChars = doc.structure.pages.at(-1)?.charEnd ?? 0;
 
   return (
     <ReaderHeader
@@ -448,6 +449,8 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
                 approximateHighlighting={approximateHighlighting}
                 currentPage={currentPage}
                 totalPages={totalPages}
+                currentCharOffset={currentCharOffset}
+                totalChars={totalChars}
                 onPlay={() => controllerRef.current?.play()}
                 onPause={() => controllerRef.current?.pause()}
                 onStop={() => controllerRef.current?.stop()}

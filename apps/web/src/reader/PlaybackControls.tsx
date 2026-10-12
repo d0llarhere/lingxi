@@ -4,8 +4,18 @@ import { EDGE_VOICE_PREFIX, EDGE_VOICES, type AriaWakeStatus } from '../tts/edge
 import type { KokoroStatusSnapshot } from '../tts/kokoro/KokoroTTSEngine';
 import { KOKORO_VOICE_PREFIX, KOKORO_VOICES } from '../tts/kokoro/KokoroTTSEngine';
 import type { OfflineDownloadSnapshot } from '../tts/offlineDownload';
+import { formatDuration } from './formatDuration';
 
 const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 1.75, 2];
+
+// A rough, unvalidated reading-aloud rate at 1x, used only to turn character
+// counts into a displayed time estimate — not calibrated per voice/engine
+// the way WebSpeechTTSEngine's own estimator is (that one tracks real
+// utterance durations for its position fallback; this is a much coarser
+// "roughly how long is this book" display, so a shared constant is enough).
+// Matches WebSpeechTTSEngine's seed value for consistency, not because the
+// two are coupled.
+const ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 = 17;
 
 interface PlaybackControlsProps {
   state: PlaybackState;
@@ -21,6 +31,8 @@ interface PlaybackControlsProps {
   approximateHighlighting: boolean;
   currentPage: number | null;
   totalPages: number;
+  currentCharOffset: number;
+  totalChars: number;
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
@@ -49,6 +61,8 @@ export function PlaybackControls({
   approximateHighlighting,
   currentPage,
   totalPages,
+  currentCharOffset,
+  totalChars,
   onPlay,
   onPause,
   onStop,
@@ -64,6 +78,12 @@ export function PlaybackControls({
 }: PlaybackControlsProps) {
   const percent = Math.round(progress * 100);
   const isPlaying = state === 'playing';
+  // Recomputed from `rate` on every render, so changing speed immediately
+  // updates both numbers — not just the total, which would otherwise look
+  // wrong relative to an elapsed time still reflecting the old speed.
+  const charsPerSecond = ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 * rate;
+  const elapsedLabel = formatDuration(currentCharOffset / charsPerSecond);
+  const totalLabel = formatDuration(totalChars / charsPerSecond);
   const browserVoices = voices.filter(
     (voice) => !voice.voiceURI.startsWith(KOKORO_VOICE_PREFIX) && !voice.voiceURI.startsWith(EDGE_VOICE_PREFIX),
   );
@@ -102,6 +122,13 @@ export function PlaybackControls({
       </div>
 
       <div className="playback-controls-row">
+        <span className="playback-time" aria-live="off">
+          <span className="visually-hidden">Elapsed / total estimated time</span>
+          <span aria-hidden="true">
+            {elapsedLabel} / ~{totalLabel}
+          </span>
+        </span>
+
         <div className="playback-transport">
           <button type="button" className="btn btn-icon" onClick={onPrevious} aria-label="Previous sentence">
             <PreviousIcon />
