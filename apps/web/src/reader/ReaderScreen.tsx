@@ -89,7 +89,7 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
   // to not-started on every document switch, then let the subscription
   // reflect reality for this document going forward.
   useEffect(() => {
-    setOfflineDownloadStatus({ status: 'not-started', progress: 0, error: null });
+    setOfflineDownloadStatus({ status: 'not-started', progress: 0, error: null, etaSeconds: null });
     return offlineDownloader.subscribe(setOfflineDownloadStatus);
   }, [documentId]);
 

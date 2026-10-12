@@ -251,7 +251,10 @@ export function PlaybackControls({
 
           {offlineDownloadStatus.status === 'downloading' && (
             <>
-              <span>Downloading for offline… {Math.round(offlineDownloadStatus.progress * 100)}%</span>
+              <span>
+                Downloading for offline… {Math.round(offlineDownloadStatus.progress * 100)}%
+                {offlineDownloadStatus.etaSeconds !== null && ` · ~${formatDuration(offlineDownloadStatus.etaSeconds)} remaining`}
+              </span>
               <progress className="local-voice-progress" value={offlineDownloadStatus.progress} max={1} />
             </>
           )}
