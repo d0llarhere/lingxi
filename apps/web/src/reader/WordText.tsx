@@ -11,6 +11,11 @@ interface WordTextProps {
 
 export interface WordTextHandle {
   setActiveWord: (wordIndex: number | null) => void;
+  // Tints the whole sentence containing the word currently being spoken
+  // (lingxi-redesign/REDESIGN_BRIEF.md's pill player spec) — same
+  // imperative-class approach as setActiveWord, driven by
+  // ReadingCursor.sentenceIndex (already tracked, no new data needed).
+  setActiveSentence: (sentenceIndex: number | null) => void;
   // Search highlighting — same imperative DOM-class approach as
   // setActiveWord (see the perf note above), not React state: a document
   // with hundreds of thousands of words can't re-render on every keystroke.
@@ -25,9 +30,15 @@ interface Segment {
   wordIndex: number;
 }
 
+interface Sentence {
+  key: string;
+  sentenceIndex: number;
+  segments: Segment[];
+}
+
 interface Paragraph {
   key: string;
-  segments: Segment[];
+  sentences: Sentence[];
 }
 
 // Reconstructs the exact original text (whitespace/punctuation included) as a
@@ -52,20 +63,27 @@ export const WordText = memo(
     ref,
   ) {
     const wordElsRef = useRef<Map<number, HTMLSpanElement>>(new Map());
+    const sentenceElsRef = useRef<Map<number, HTMLSpanElement>>(new Map());
+    const activeSentenceIndexRef = useRef<number | null>(null);
     const activeIndexRef = useRef<number | null>(null);
     const searchMatchIndicesRef = useRef<Set<number>>(new Set());
     const activeMatchIndexRef = useRef<number | null>(null);
     // Lazily-created; only needed once playback actually starts scrolling.
     const visibilityObserverRef = useRef<IntersectionObserver | null>(null);
 
-    // Grouped by paragraph (not one flat span list) so each paragraph can be
-    // its own `content-visibility: auto` block — see the perf note below.
-    // Uses each ParagraphRef's own charStart/charEnd as the authoritative
-    // bounds (not word-transition inference — an earlier version of this
-    // inferred paragraph boundaries from where word.paragraphIndex changed,
-    // which silently dropped each paragraph's trailing punctuation, since
-    // that punctuation sits in the "gap" after the last word but was never
-    // attributed to the paragraph that was just closed out).
+    // Grouped by paragraph, then by sentence within it (not one flat span
+    // list) so each paragraph can be its own `content-visibility: auto`
+    // block — see the perf note below — and so the currently-spoken
+    // sentence can be tinted as one wrapping element (brief:
+    // --highlight-sentence + box-decoration-break: clone so wrapped lines
+    // tint correctly). Uses each ParagraphRef's own charStart/charEnd as the
+    // authoritative bounds (not word-transition inference — an earlier
+    // version of this inferred paragraph boundaries from where
+    // word.paragraphIndex changed, which silently dropped each paragraph's
+    // trailing punctuation, since that punctuation sits in the "gap" after
+    // the last word but was never attributed to the paragraph that was just
+    // closed out). The same gap-trails-the-preceding-word convention applies
+    // at the sentence level below.
     const paragraphs = useMemo<Paragraph[]>(() => {
       const wordsByParagraph = new Map<number, WordRef[]>();
       for (const word of words) {
@@ -82,9 +100,23 @@ export const WordText = memo(
         const paragraphWords = wordsByParagraph.get(paragraphRef.index);
         if (!paragraphWords || paragraphWords.length === 0) continue;
 
-        const segments: Segment[] = [];
+        const sentences: Sentence[] = [];
+        let segments: Segment[] = [];
         let cursor = paragraphRef.charStart;
+        let currentSentenceIndex = paragraphWords[0]!.sentenceIndex;
+
+        const flushSentence = (end: number) => {
+          if (segments.length === 0) return;
+          sentences.push({ key: `s-${currentSentenceIndex}`, sentenceIndex: currentSentenceIndex, segments });
+          segments = [];
+          void end;
+        };
+
         for (const word of paragraphWords) {
+          if (word.sentenceIndex !== currentSentenceIndex) {
+            flushSentence(cursor);
+            currentSentenceIndex = word.sentenceIndex;
+          }
           if (word.charStart > cursor) {
             segments.push({ key: `gap-${word.index}`, isWord: false, content: text.slice(cursor, word.charStart), wordIndex: -1 });
           }
@@ -99,8 +131,9 @@ export const WordText = memo(
         if (cursor < paragraphRef.charEnd) {
           segments.push({ key: `gap-end-${paragraphRef.index}`, isWord: false, content: text.slice(cursor, paragraphRef.charEnd), wordIndex: -1 });
         }
+        flushSentence(paragraphRef.charEnd);
 
-        result.push({ key: `p-${paragraphRef.index}`, segments });
+        result.push({ key: `p-${paragraphRef.index}`, sentences });
       }
 
       return result;
@@ -148,6 +181,17 @@ export const WordText = memo(
       activeIndexRef.current = wordIndex;
     };
 
+    const setActiveSentence = (sentenceIndex: number | null) => {
+      const prevIndex = activeSentenceIndexRef.current;
+      if (prevIndex !== null) {
+        sentenceElsRef.current.get(prevIndex)?.classList.remove('is-active-sentence');
+      }
+      if (sentenceIndex !== null) {
+        sentenceElsRef.current.get(sentenceIndex)?.classList.add('is-active-sentence');
+      }
+      activeSentenceIndexRef.current = sentenceIndex;
+    };
+
     const setSearchMatches = (wordIndices: Set<number>) => {
       for (const prevIndex of searchMatchIndicesRef.current) {
         if (!wordIndices.has(prevIndex)) wordElsRef.current.get(prevIndex)?.classList.remove('is-search-match');
@@ -167,6 +211,7 @@ export const WordText = memo(
 
     useImperativeHandle(ref, () => ({
       setActiveWord: (wordIndex) => setActiveWord(wordIndex, true),
+      setActiveSentence,
       setSearchMatches,
       setActiveMatch,
     }));
@@ -180,7 +225,10 @@ export const WordText = memo(
     // without scrolling (the reader should open at the top, not jump).
     useEffect(() => {
       activeIndexRef.current = null;
+      activeSentenceIndexRef.current = null;
       setActiveWord(initialHighlightWordIndex, false);
+      const word = initialHighlightWordIndex !== null ? words[initialHighlightWordIndex] : undefined;
+      setActiveSentence(word?.sentenceIndex ?? null);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [text, words]);
 
@@ -209,25 +257,37 @@ export const WordText = memo(
       <div className="reading-column" onClick={handleClick} onKeyDown={handleKeyDown}>
         {paragraphs.map((paragraph) => (
           <p key={paragraph.key} className="reading-paragraph">
-            {paragraph.segments.map((segment) =>
-              segment.isWord ? (
-                <span
-                  key={segment.key}
-                  ref={(el) => {
-                    if (el) wordElsRef.current.set(segment.wordIndex, el);
-                    else wordElsRef.current.delete(segment.wordIndex);
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  data-word-index={segment.wordIndex}
-                  className="reading-word"
-                >
-                  {segment.content}
-                </span>
-              ) : (
-                <span key={segment.key}>{segment.content}</span>
-              ),
-            )}
+            {paragraph.sentences.map((sentence) => (
+              <span
+                key={sentence.key}
+                ref={(el) => {
+                  if (el) sentenceElsRef.current.set(sentence.sentenceIndex, el);
+                  else sentenceElsRef.current.delete(sentence.sentenceIndex);
+                }}
+                data-sentence-index={sentence.sentenceIndex}
+                className="reading-sentence"
+              >
+                {sentence.segments.map((segment) =>
+                  segment.isWord ? (
+                    <span
+                      key={segment.key}
+                      ref={(el) => {
+                        if (el) wordElsRef.current.set(segment.wordIndex, el);
+                        else wordElsRef.current.delete(segment.wordIndex);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      data-word-index={segment.wordIndex}
+                      className="reading-word"
+                    >
+                      {segment.content}
+                    </span>
+                  ) : (
+                    <span key={segment.key}>{segment.content}</span>
+                  ),
+                )}
+              </span>
+            ))}
           </p>
         ))}
       </div>

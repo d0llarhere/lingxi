@@ -51,12 +51,23 @@
   contain-intrinsic-size: auto 200px;
 }
 
+.reading-sentence {
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.reading-sentence.is-active-sentence {
+  background: var(--highlight-sentence);
+}
+
 .reading-word {
   border-radius: 4px;
   padding: 0.03em 0.05em;
   margin: -0.03em -0.05em;
   cursor: pointer;
   transition: background-color var(--transition-fast);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .reading-word:hover {
@@ -71,10 +82,10 @@
      highlight tick during playback (measured: ~50-90% of playback time spent
      in main-thread long tasks on a 184k-word document) and was the dominant
      remaining cause of the highlight visibly lagging behind the audio.
-     background/color/box-shadow are paint-only — no reflow. */
-  background: var(--highlight);
-  color: var(--highlight-text);
-  box-shadow: 0 0 0 1px var(--highlight);
+     background is paint-only — no reflow. Text keeps its normal color (no
+     separate --highlight-text) per the brief — only the sentence/word tints
+     change. */
+  background: var(--highlight-word);
 }
 
 /* Search matches — same paint-only approach as .is-active above, for the

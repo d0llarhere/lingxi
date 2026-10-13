@@ -111,6 +111,14 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
     return offlineDownloader.subscribe(setOfflineDownloadStatus);
   }, [documentId]);
 
+  // Shared by the old controls' speed row, the pill's speed chip/stepper,
+  // and the [ / ] keyboard shortcuts — previously duplicated inline in two
+  // places.
+  const handleRateChange = useCallback((value: number) => {
+    setRate(value);
+    controllerRef.current?.setSpeed(value);
+  }, []);
+
   const handleDownloadOffline = useCallback(() => {
     if (!loaded || !voiceURI) return;
     void offlineDownloader.download(loaded.doc, loaded.text, voiceURI, rate);
@@ -314,6 +322,7 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
       onStateChange: setPlaybackState,
       onCursorChange: (cursor) => {
         wordTextRef.current?.setActiveWord(cursor.wordIndex);
+        wordTextRef.current?.setActiveSentence(cursor.sentenceIndex);
         setCurrentPageIndex(cursor.pageIndex);
         setCurrentCharOffset(cursor.charOffset);
         setCurrentParagraphIndex(cursor.paragraphIndex);
@@ -322,6 +331,8 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
       onEstimatedWordChange: (wordIndex) => {
         setApproximateHighlighting(true);
         wordTextRef.current?.setActiveWord(wordIndex);
+        const word = loaded.doc.structure.words[wordIndex];
+        if (word) wordTextRef.current?.setActiveSentence(word.sentenceIndex);
       },
       onPersistError: (error) => console.error('Failed to persist playback state', error),
     });
@@ -485,8 +496,14 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
       if (controller.getState() === 'playing') controller.pause();
       else controller.play();
     },
-    onPrevious: () => controllerRef.current?.previousSentence(),
-    onNext: () => controllerRef.current?.nextSentence(),
+    // Matches the pill's prev/next buttons (brief: "← → previous/next
+    // paragraph") — the old bottom bar's own prev/next buttons are
+    // unaffected, still sentence-level, until it's deleted in [pill-cleanup].
+    onPrevious: () => controllerRef.current?.previousParagraph(),
+    onNext: () => controllerRef.current?.nextParagraph(),
+    onSpeedDown: () => handleRateChange(Math.round((rate - 0.25) * 100) / 100),
+    onSpeedUp: () => handleRateChange(Math.round((rate + 0.25) * 100) / 100),
+    isMenuOpen: pillMenuOpen,
     onEscape: onBack,
   });
 
@@ -524,6 +541,7 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
   return (
     <ReaderHeader
       title={doc.title}
+      chapterSubtitle={currentChapter ? `Chapter ${currentChapter.number} · ${currentChapter.title}` : undefined}
       onBack={onBack}
       onRename={() => setRenaming(true)}
       onDelete={() => setDeleting(true)}
@@ -594,10 +612,7 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
                 onStop={() => controllerRef.current?.stop()}
                 onPrevious={() => controllerRef.current?.previousSentence()}
                 onNext={() => controllerRef.current?.nextSentence()}
-                onRateChange={(value) => {
-                  setRate(value);
-                  controllerRef.current?.setSpeed(value);
-                }}
+                onRateChange={handleRateChange}
                 onVoiceChange={(value) => {
                   setVoiceURI(value);
                   controllerRef.current?.setVoice(value);
@@ -628,10 +643,7 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
                     onPause={() => controllerRef.current?.pause()}
                     onPrevious={() => controllerRef.current?.previousParagraph()}
                     onNext={() => controllerRef.current?.nextParagraph()}
-                    onRateChange={(value) => {
-                      setRate(value);
-                      controllerRef.current?.setSpeed(value);
-                    }}
+                    onRateChange={handleRateChange}
                     voices={voices}
                     voiceURI={voiceURI}
                     onVoiceChange={(value) => {

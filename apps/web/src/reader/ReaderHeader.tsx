@@ -5,6 +5,9 @@ import { ThemeToggle } from '../theme/ThemeToggle';
 
 interface ReaderHeaderProps {
   title: string;
+  // "Chapter {n} · {title}" — brief's two-line header. Absent when
+  // detectChapters found nothing for this document.
+  chapterSubtitle?: string;
   onBack: () => void;
   onRename: () => void;
   onDelete: () => void;
@@ -13,7 +16,16 @@ interface ReaderHeaderProps {
   children: React.ReactNode;
 }
 
-export function ReaderHeader({ title, onBack, onRename, onDelete, onToggleToc, onToggleSearch, children }: ReaderHeaderProps) {
+export function ReaderHeader({
+  title,
+  chapterSubtitle,
+  onBack,
+  onRename,
+  onDelete,
+  onToggleToc,
+  onToggleSearch,
+  children,
+}: ReaderHeaderProps) {
   return (
     <AppShell
       start={
@@ -21,7 +33,10 @@ export function ReaderHeader({ title, onBack, onRename, onDelete, onToggleToc, o
           <button type="button" className="btn btn-icon" onClick={onBack} aria-label="Back to library">
             <ChevronLeftIcon />
           </button>
-          <span className="topbar-title">{title}</span>
+          <span className="topbar-title-group">
+            <span className="topbar-title">{title}</span>
+            {chapterSubtitle && <span className="topbar-subtitle">{chapterSubtitle}</span>}
+          </span>
         </>
       }
       end={
