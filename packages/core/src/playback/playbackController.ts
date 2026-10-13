@@ -65,6 +65,12 @@ export class PlaybackController {
 
   private readonly wordsBySentence: Map<number, WordRef[]> = new Map();
   private readonly sentenceFirstWordIndex: number[];
+  // Mirrors sentenceFirstWordIndex exactly, for the pill player's
+  // paragraph-granularity previous/next buttons (see
+  // lingxi-redesign/REDESIGN_BRIEF.md) — a separate index rather than
+  // deriving paragraph position from sentenceFirstWordIndex each call,
+  // same reasoning that already justified the sentence one.
+  private readonly paragraphFirstWordIndex: number[];
   private readonly totalLength: number;
 
   private cursor: ReadingCursor;
@@ -90,6 +96,7 @@ export class PlaybackController {
     this.onPersistError = opts.onPersistError;
 
     this.sentenceFirstWordIndex = new Array(this.structure.sentences.length).fill(-1);
+    this.paragraphFirstWordIndex = new Array(this.structure.paragraphs.length).fill(-1);
     for (const word of this.structure.words) {
       let bucket = this.wordsBySentence.get(word.sentenceIndex);
       if (!bucket) {
@@ -99,6 +106,9 @@ export class PlaybackController {
       bucket.push(word);
       if (this.sentenceFirstWordIndex[word.sentenceIndex] === -1) {
         this.sentenceFirstWordIndex[word.sentenceIndex] = word.index;
+      }
+      if (this.paragraphFirstWordIndex[word.paragraphIndex] === -1) {
+        this.paragraphFirstWordIndex[word.paragraphIndex] = word.index;
       }
     }
 
@@ -168,6 +178,22 @@ export class PlaybackController {
     const target = this.findSentenceWithWords(this.cursor.sentenceIndex + 1, 1);
     if (target === null) return;
     this.seekToWord(this.sentenceFirstWordIndex[target] as number);
+  }
+
+  // Paragraph-granularity equivalents of previousSentence()/nextSentence() —
+  // the pill player's prev/next buttons (see lingxi-redesign's
+  // REDESIGN_BRIEF.md), not used internally by chunk advancement, which
+  // still steps sentence-by-sentence (see handleUtteranceEnd).
+  previousParagraph(): void {
+    const target = this.findParagraphWithWords(this.cursor.paragraphIndex - 1, -1);
+    if (target === null) return;
+    this.seekToWord(this.paragraphFirstWordIndex[target] as number);
+  }
+
+  nextParagraph(): void {
+    const target = this.findParagraphWithWords(this.cursor.paragraphIndex + 1, 1);
+    if (target === null) return;
+    this.seekToWord(this.paragraphFirstWordIndex[target] as number);
   }
 
   // Click-to-read: stop current playback, move+persist the cursor, begin
@@ -332,6 +358,15 @@ export class PlaybackController {
     let index = start;
     while (index >= 0 && index < this.sentenceFirstWordIndex.length) {
       if (this.sentenceFirstWordIndex[index] !== -1) return index;
+      index += step;
+    }
+    return null;
+  }
+
+  private findParagraphWithWords(start: number, step: 1 | -1): number | null {
+    let index = start;
+    while (index >= 0 && index < this.paragraphFirstWordIndex.length) {
+      if (this.paragraphFirstWordIndex[index] !== -1) return index;
       index += step;
     }
     return null;

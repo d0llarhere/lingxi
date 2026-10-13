@@ -82,6 +82,14 @@ function makeController(
 
 const THREE_SENTENCE_TEXT = 'First sentence here. Second sentence here. Third sentence here.';
 
+// Each paragraph has two sentences, so paragraph-navigation tests can
+// confirm nextParagraph()/previousParagraph() skip a whole paragraph in one
+// step rather than landing on its second sentence.
+const THREE_PARAGRAPH_TEXT =
+  'First paragraph has two sentences. It continues right here.\n\n' +
+  'Second paragraph also has two sentences. More text follows it.\n\n' +
+  'Third paragraph is the last one. It also has two sentences.';
+
 describe('PlaybackController', () => {
   let structure: DocumentStructure;
 
@@ -426,6 +434,35 @@ describe('PlaybackController', () => {
     controller.seekToWord(structure.words.at(-1)!.index);
     const callsAfterSeek = engine.speakCalls.length;
     controller.nextSentence();
+    expect(engine.speakCalls).toHaveLength(callsAfterSeek); // no-op, no new speak call
+  });
+
+  it('previousParagraph/nextParagraph move the cursor to the adjacent paragraph and start reading there', () => {
+    const paragraphStructure = segmentText(THREE_PARAGRAPH_TEXT);
+    const { controller, engine } = makeController(paragraphStructure, THREE_PARAGRAPH_TEXT);
+    controller.play();
+
+    controller.nextParagraph();
+    expect(controller.getCursor().paragraphIndex).toBe(1);
+    expect(engine.lastSpeak!.text.startsWith('Second paragraph')).toBe(true);
+
+    controller.previousParagraph();
+    expect(controller.getCursor().paragraphIndex).toBe(0);
+    expect(engine.lastSpeak!.text.startsWith('First paragraph')).toBe(true);
+  });
+
+  it('previousParagraph at the first paragraph and nextParagraph at the last paragraph are safe no-ops', () => {
+    const paragraphStructure = segmentText(THREE_PARAGRAPH_TEXT);
+    const { controller, engine } = makeController(paragraphStructure, THREE_PARAGRAPH_TEXT);
+    controller.play();
+    engine.cancelCallCount = 0;
+
+    controller.previousParagraph();
+    expect(controller.getCursor().paragraphIndex).toBe(0);
+
+    controller.seekToWord(paragraphStructure.words.at(-1)!.index);
+    const callsAfterSeek = engine.speakCalls.length;
+    controller.nextParagraph();
     expect(engine.speakCalls).toHaveLength(callsAfterSeek); // no-op, no new speak call
   });
 
