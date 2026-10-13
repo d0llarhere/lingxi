@@ -5,7 +5,7 @@ import { PlaceholderScreen } from './library/PlaceholderScreen';
 import type { NavKey } from './library/Sidebar';
 import { ReaderScreen } from './reader/ReaderScreen';
 
-type View = { type: 'nav'; nav: NavKey } | { type: 'reader'; documentId: string };
+type View = { type: 'nav'; nav: NavKey } | { type: 'reader'; documentId: string; autoplay?: boolean };
 
 export function App() {
   const [view, setView] = useState<View>({ type: 'nav', nav: 'library' });
@@ -13,7 +13,11 @@ export function App() {
   if (view.type === 'reader') {
     return (
       <LibraryProvider>
-        <ReaderScreen documentId={view.documentId} onBack={() => setView({ type: 'nav', nav: 'library' })} />
+        <ReaderScreen
+          documentId={view.documentId}
+          autoplay={view.autoplay}
+          onBack={() => setView({ type: 'nav', nav: 'library' })}
+        />
       </LibraryProvider>
     );
   }
@@ -22,7 +26,7 @@ export function App() {
     <LibraryProvider>
       {view.nav === 'library' ? (
         <LibraryScreen
-          onOpenDocument={(documentId) => setView({ type: 'reader', documentId })}
+          onOpenDocument={(documentId, options) => setView({ type: 'reader', documentId, autoplay: options?.autoplay })}
           onNavigate={(nav) => setView({ type: 'nav', nav })}
         />
       ) : (

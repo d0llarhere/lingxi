@@ -32,6 +32,10 @@ import { WordText, type WordTextHandle } from './WordText';
 
 interface ReaderScreenProps {
   documentId: string;
+  // Set when opened via the library list's "resume listening" play button
+  // (lingxi-redesign/REDESIGN_BRIEF.md) — starts playback immediately
+  // instead of just opening to the current position.
+  autoplay?: boolean;
   onBack: () => void;
 }
 
@@ -42,7 +46,7 @@ interface LoadedDocument {
   settings: PlaybackSettings;
 }
 
-export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
+export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps) {
   const { repository, ready } = useLibrary();
   const [loaded, setLoaded] = useState<LoadedDocument | null>(null);
   const controllerRef = useRef<PlaybackController | null>(null);
@@ -332,6 +336,7 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
     });
 
     controllerRef.current = controller;
+    if (autoplay) controller.play();
     setPlaybackState(controller.getState());
     setCurrentPageIndex(controller.getCursor().pageIndex);
     setCurrentCharOffset(controller.getCursor().charOffset);

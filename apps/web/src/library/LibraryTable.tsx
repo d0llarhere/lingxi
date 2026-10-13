@@ -7,7 +7,7 @@ type SortDirection = 'asc' | 'desc';
 
 interface LibraryTableProps {
   cards: DocumentCardData[];
-  onOpenDocument: (documentId: string) => void;
+  onOpenDocument: (documentId: string, options?: { autoplay?: boolean }) => void;
   onRename: (doc: DocumentCardData['doc']) => void;
   onDelete: (doc: DocumentCardData['doc']) => void;
 }
@@ -62,6 +62,7 @@ export function LibraryTable({ cards, onOpenDocument, onRename, onDelete }: Libr
           key={card.doc.id}
           data={card}
           onOpen={() => onOpenDocument(card.doc.id)}
+          onPlay={() => onOpenDocument(card.doc.id, { autoplay: true })}
           onRename={() => onRename(card.doc)}
           onDelete={() => onDelete(card.doc)}
         />

@@ -12,6 +12,10 @@ import { useLibrary } from './LibraryProvider';
 interface DocumentRowProps {
   data: DocumentCardData;
   onOpen: () => void;
+  // The round play button starts or resumes listening right away, unlike
+  // clicking the title which just opens to the current position (brief's
+  // "starts or resumes listening right away").
+  onPlay: () => void;
   onRename: () => void;
   onDelete: () => void;
 }
@@ -52,7 +56,7 @@ function formatLength(totalPages: number, totalChars: number, rate: number): str
   return `~${Math.max(1, minutes)} min`;
 }
 
-export function DocumentRow({ data, onOpen, onRename, onDelete }: DocumentRowProps) {
+export function DocumentRow({ data, onOpen, onPlay, onRename, onDelete }: DocumentRowProps) {
   const { doc, progress, charOffset, totalPages, totalChars } = data;
   const { repository } = useLibrary();
   const [chapter, setChapter] = useState<{ number: number; title: string } | null>(null);
@@ -118,7 +122,7 @@ export function DocumentRow({ data, onOpen, onRename, onDelete }: DocumentRowPro
           type="button"
           className={`doc-row-play${progress > 0 ? ' doc-row-play-active' : ''}`}
           aria-label={progress > 0 ? 'Resume listening' : 'Start listening'}
-          onClick={onOpen}
+          onClick={onPlay}
         >
           <PlayIcon width={14} height={14} />
         </button>

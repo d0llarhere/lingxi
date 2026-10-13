@@ -17,7 +17,7 @@ type LibraryView = 'grid' | 'list';
 const VIEW_STORAGE_KEY = 'lingxi-library-view';
 
 interface LibraryScreenProps {
-  onOpenDocument: (documentId: string) => void;
+  onOpenDocument: (documentId: string, options?: { autoplay?: boolean }) => void;
   onNavigate: (nav: NavKey) => void;
 }
 
