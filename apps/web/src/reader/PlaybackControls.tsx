@@ -4,18 +4,9 @@ import { EDGE_VOICE_PREFIX, EDGE_VOICES, type AriaWakeStatus } from '../tts/edge
 import type { KokoroStatusSnapshot } from '../tts/kokoro/KokoroTTSEngine';
 import { KOKORO_VOICE_PREFIX, KOKORO_VOICES } from '../tts/kokoro/KokoroTTSEngine';
 import type { OfflineDownloadSnapshot } from '../tts/offlineDownload';
-import { formatDuration } from './formatDuration';
+import { ESTIMATED_CHARS_PER_SECOND_AT_RATE_1, formatDuration } from './formatDuration';
 
 const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 1.75, 2];
-
-// A rough, unvalidated reading-aloud rate at 1x, used only to turn character
-// counts into a displayed time estimate — not calibrated per voice/engine
-// the way WebSpeechTTSEngine's own estimator is (that one tracks real
-// utterance durations for its position fallback; this is a much coarser
-// "roughly how long is this book" display, so a shared constant is enough).
-// Matches WebSpeechTTSEngine's seed value for consistency, not because the
-// two are coupled.
-const ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 = 17;
 
 interface PlaybackControlsProps {
   state: PlaybackState;

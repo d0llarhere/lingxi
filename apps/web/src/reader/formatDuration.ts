@@ -1,3 +1,12 @@
+// A rough, unvalidated reading-aloud rate at 1x, used only to turn character
+// counts into a displayed time estimate — not calibrated per voice/engine
+// the way WebSpeechTTSEngine's own estimator is (that one tracks real
+// utterance durations for its position fallback; this is a much coarser
+// "roughly how long is this book/chapter" display). Shared by the playback
+// timeline and the pill player's "remaining in chapter" readout so there's
+// one estimate, not two that could drift apart.
+export const ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 = 17;
+
 // Formats a duration in seconds as "M:SS" (under an hour) or "H:MM:SS" —
 // shared by the playback timeline's elapsed/total readout and the offline
 // download's remaining-time estimate.

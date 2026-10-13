@@ -263,6 +263,165 @@
   }
 }
 
+/* Mini pill player (lingxi-redesign/REDESIGN_BRIEF.md) — floating,
+   horizontally centered, replaces .playback-bar. Uses the redesign's own
+   token set (--surface/--border/--text/--accent/--on-accent/--divider),
+   not the older --background/--text-primary pair .playback-bar used, since
+   this is the one surface in the app that's actually been redesigned. */
+
+.pill-dock {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.pill {
+  height: 64px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  color: var(--text);
+  font-size: 13px;
+  transition: height var(--transition-base), padding var(--transition-base), gap var(--transition-base);
+}
+
+.pill-collapsed {
+  height: 48px;
+  padding: 0 16px 0 6px;
+  gap: 10px;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+}
+
+.pill-collapsed-label {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pill-icon-btn {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  opacity: 0.85;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.pill-icon-btn:hover {
+  background: var(--surface-2);
+  opacity: 1;
+}
+
+.pill-icon-btn[aria-expanded='true'] {
+  background: var(--surface-2);
+  color: var(--text);
+  opacity: 1;
+}
+
+.pill-play {
+  position: relative;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pill-play-ring {
+  position: absolute;
+  inset: 0;
+}
+
+.pill-play-icon {
+  position: relative;
+  display: flex;
+  color: var(--on-accent);
+}
+
+.pill-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--divider);
+  margin: 0 10px 0 8px;
+  flex-shrink: 0;
+}
+
+.pill-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 176px;
+}
+
+.pill-info-line1 {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pill-info-dot {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.pill-info-line2 {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pill-speed-chip {
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 10px;
+  margin-left: 4px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.pill-speed-chip:hover {
+  background: var(--surface-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill {
+    transition: none;
+  }
+}
+
 /* Table of contents sidebar */
 
 .toc-sidebar {

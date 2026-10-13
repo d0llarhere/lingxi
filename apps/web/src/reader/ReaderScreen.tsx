@@ -2,6 +2,7 @@ import {
   detectChapters,
   findWordIndexAtOrAfterOffset,
   PlaybackController,
+  type ChapterRef,
   type LingxiDocument,
   type PlaybackSettings,
   type PlaybackState,
@@ -19,12 +20,19 @@ import { RenameDialog } from '../library/RenameDialog';
 import { ariaWakeTracker } from '../tts/edge/EdgeTTSEngine';
 import { offlineDownloader } from '../tts/offlineDownload';
 import { kokoroEngine, ttsEngine } from '../tts/ttsEngineInstance';
+import { ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 } from './formatDuration';
 import { PlaybackControls } from './PlaybackControls';
+import { PlaybackPill } from './PlaybackPill';
 import { ReaderHeader } from './ReaderHeader';
 import { SearchBar } from './SearchBar';
 import { TocSidebar, type TocEntry } from './TocSidebar';
 import { useReaderShortcuts } from './useReaderShortcuts';
 import { WordText, type WordTextHandle } from './WordText';
+
+// Pill player is being built alongside the existing bottom bar so each piece
+// is testable on its own before PlaybackControls is deleted (see
+// lingxi-redesign/REDESIGN_BRIEF.md's commit sequence, [pill-cleanup]).
+const SHOW_PILL = true;
 
 interface ReaderScreenProps {
   documentId: string;
@@ -69,6 +77,8 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const [currentCharOffset, setCurrentCharOffset] = useState(0);
+  const [currentParagraphIndex, setCurrentParagraphIndex] = useState(0);
+  const [pillMenuOpen, setPillMenuOpen] = useState(false);
   const [kokoroStatus, setKokoroStatus] = useState(kokoroEngine.getStatusSnapshot());
   const [offlineDownloadStatus, setOfflineDownloadStatus] = useState(offlineDownloader.getStatusSnapshot());
   const [ariaWakeStatus, setAriaWakeStatus] = useState(ariaWakeTracker.getStatus());
@@ -188,6 +198,7 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
         wordTextRef.current?.setActiveWord(cursor.wordIndex);
         setCurrentPageIndex(cursor.pageIndex);
         setCurrentCharOffset(cursor.charOffset);
+        setCurrentParagraphIndex(cursor.paragraphIndex);
         setProgress(controller.getProgress());
       },
       onEstimatedWordChange: (wordIndex) => {
@@ -201,6 +212,7 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
     setPlaybackState(controller.getState());
     setCurrentPageIndex(controller.getCursor().pageIndex);
     setCurrentCharOffset(controller.getCursor().charOffset);
+    setCurrentParagraphIndex(controller.getCursor().paragraphIndex);
     setProgress(controller.getProgress());
     setRate(loaded.settings.playbackSpeed);
     setVoiceURI(loaded.settings.selectedVoiceURI);
@@ -239,14 +251,17 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repository, loaded?.doc.id]);
 
+  // Raw chapter detection, memoized once (detectChapters scans the whole
+  // document text) and shared by the TOC fallback below and the pill
+  // player's "current chapter" derivation — one scan, two consumers.
+  const chapters = useMemo<ChapterRef[]>(() => (loaded ? detectChapters(loaded.text) : []), [loaded]);
+
   // Chapters first; if none were detected (no recognizable headers — true
   // for most pasted text, and for PDFs without a clear "Chapter N" style),
   // fall back to one entry per PDF page so the TOC is never empty for a
-  // document that has real page boundaries. Memoized: detectChapters scans
-  // the whole document text, not worth re-running on every render.
+  // document that has real page boundaries.
   const tocEntries = useMemo<TocEntry[]>(() => {
     if (!loaded) return [];
-    const chapters = detectChapters(loaded.text);
     if (chapters.length > 0) return chapters;
     if (loaded.doc.structure.pages.length > 1) {
       return loaded.doc.structure.pages.map((page) => ({
@@ -255,7 +270,29 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
       }));
     }
     return [];
-  }, [loaded]);
+  }, [loaded, chapters]);
+
+  // The chapter containing the current cursor position, plus where it ends
+  // (the next chapter's start, or end-of-document for the last one) — the
+  // pill player's "Ch. {n} · {title}" line and its chapter-scoped progress
+  // ring/remaining-time both derive from this. null when detectChapters
+  // found nothing (pill falls back to a paragraph count instead).
+  const currentChapter = useMemo(() => {
+    if (chapters.length === 0) return null;
+    let index = -1;
+    for (let i = 0; i < chapters.length; i++) {
+      if (chapters[i]!.charStart <= currentCharOffset) index = i;
+      else break;
+    }
+    if (index === -1) return null;
+    const totalChars = loaded?.doc.structure.pages.at(-1)?.charEnd ?? 0;
+    return {
+      number: index + 1,
+      title: chapters[index]!.title,
+      charStart: chapters[index]!.charStart,
+      nextCharStart: chapters[index + 1]?.charStart ?? totalChars,
+    };
+  }, [chapters, currentCharOffset, loaded]);
 
   const handleTocSelect = useCallback(
     (charStart: number) => {
@@ -382,6 +419,16 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
   const totalPages = doc.structure.pages.length;
   const currentPage = totalPages > 1 ? currentPageIndex + 1 : null;
   const totalChars = doc.structure.pages.at(-1)?.charEnd ?? 0;
+  const totalParagraphs = doc.structure.paragraphs.length;
+  const pillProgress = currentChapter
+    ? Math.min(
+        1,
+        Math.max(0, (currentCharOffset - currentChapter.charStart) / (currentChapter.nextCharStart - currentChapter.charStart || 1)),
+      )
+    : progress;
+  const remainingInChapterSeconds = currentChapter
+    ? (currentChapter.nextCharStart - currentCharOffset) / (ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 * rate)
+    : null;
 
   return (
     <ReaderHeader
@@ -470,6 +517,32 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
                 onExportSrt={handleExportSrt}
                 onSeek={(fraction) => controllerRef.current?.seekToProgress(fraction)}
               />
+              {SHOW_PILL && (
+                <div className="pill-dock">
+                  <PlaybackPill
+                    state={playbackState}
+                    progress={pillProgress}
+                    rate={rate}
+                    chapterNumber={currentChapter?.number ?? null}
+                    chapterTitle={currentChapter?.title ?? null}
+                    paragraphNumber={currentParagraphIndex + 1}
+                    totalParagraphs={totalParagraphs}
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    remainingInChapterSeconds={remainingInChapterSeconds}
+                    menuOpen={pillMenuOpen}
+                    onToggleMenu={() => setPillMenuOpen((open) => !open)}
+                    onPlay={() => controllerRef.current?.play()}
+                    onPause={() => controllerRef.current?.pause()}
+                    onPrevious={() => controllerRef.current?.previousParagraph()}
+                    onNext={() => controllerRef.current?.nextParagraph()}
+                    onRateChange={(value) => {
+                      setRate(value);
+                      controllerRef.current?.setSpeed(value);
+                    }}
+                  />
+                </div>
+              )}
             </>
           )}
         </div>
