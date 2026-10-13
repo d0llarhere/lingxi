@@ -1,8 +1,8 @@
 import { computeProgress, type LingxiDocument } from '@lingxi/core';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { AppShell } from '../components/AppShell';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { GridIcon, ListIcon, SearchIcon } from '../components/icons';
+import { GridIcon, ListIcon, SearchIcon, UploadIcon } from '../components/icons';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { AddMenu } from './AddMenu';
 import { DocumentCard, type DocumentCardData } from './DocumentCard';
@@ -35,6 +35,8 @@ export function LibraryScreen({ onOpenDocument, onNavigate }: LibraryScreenProps
     const stored = localStorage.getItem(VIEW_STORAGE_KEY);
     return stored === 'grid' || stored === 'list' ? stored : 'list';
   });
+  const [dragActive, setDragActive] = useState(false);
+  const dragCounterRef = useRef(0);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
   function changeView(next: LibraryView) {
@@ -70,9 +72,8 @@ export function LibraryScreen({ onOpenDocument, onNavigate }: LibraryScreenProps
     await refresh();
   }
 
-  async function handleImportPdf(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!repository || !file) return;
+  async function importPdfFile(file: File) {
+    if (!repository) return;
 
     setImportingPdf(true);
     setError(null);
@@ -84,14 +85,59 @@ export function LibraryScreen({ onOpenDocument, onNavigate }: LibraryScreenProps
       console.error('PDF import failed', err);
       setError('Could not read this PDF. It may be corrupted or password-protected.');
       setImportingPdf(false);
-      if (pdfInputRef.current) pdfInputRef.current.value = '';
       return;
     }
     setImportingPdf(false);
-    if (pdfInputRef.current) pdfInputRef.current.value = '';
     // Deliberately outside the above try/catch: a failure here is a library
     // refresh bug, not a PDF problem, and must not be reported as one.
     await refresh();
+  }
+
+  async function handleImportPdf(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file) await importPdfFile(file);
+    if (pdfInputRef.current) pdfInputRef.current.value = '';
+  }
+
+  function handleDragEnter(e: DragEvent<HTMLDivElement>) {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    dragCounterRef.current += 1;
+    setDragActive(true);
+  }
+
+  function handleDragOver(e: DragEvent<HTMLDivElement>) {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+  }
+
+  function handleDragLeave(e: DragEvent<HTMLDivElement>) {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) setDragActive(false);
+  }
+
+  async function handleDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setDragActive(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!repository || !file) return;
+
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (extension === 'pdf') {
+      await importPdfFile(file);
+    } else if (extension === 'txt') {
+      const text = await file.text();
+      await repository.createFromPastedText(file.name.replace(/\.txt$/i, ''), text);
+      await refresh();
+    } else {
+      // EPUB and anything else isn't supported by any extractor in this
+      // codebase yet — same message an unreadable PDF would show, rather
+      // than failing silently.
+      setError('Could not import this file. Drop a PDF or .txt file.');
+    }
   }
 
   async function handleConfirmDelete() {
@@ -127,7 +173,21 @@ export function LibraryScreen({ onOpenDocument, onNavigate }: LibraryScreenProps
   );
 
   return (
-    <div className="app-shell-with-sidebar">
+    <div
+      className="app-shell-with-sidebar"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {dragActive && (
+        <div className="dnd-overlay">
+          <div className="dnd-overlay-card">
+            <UploadIcon width={28} height={28} />
+            Drop to import
+          </div>
+        </div>
+      )}
       <Sidebar active="library" onNavigate={onNavigate} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="app-shell-content">
       <AppShell

@@ -546,6 +546,33 @@
   color: var(--on-accent);
 }
 
+/* ---------- Drag-and-drop import overlay ---------- */
+
+.dnd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.dnd-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-7);
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+}
+
 @media (max-width: 720px) {
   .doc-row {
     grid-template-columns: 44px minmax(0, 1fr) auto;
