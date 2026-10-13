@@ -2,15 +2,19 @@ import { computeProgress, type LingxiDocument } from '@lingxi/core';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { AppShell } from '../components/AppShell';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { ListIcon, SearchIcon } from '../components/icons';
+import { GridIcon, ListIcon, SearchIcon } from '../components/icons';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { AddMenu } from './AddMenu';
 import { DocumentCard, type DocumentCardData } from './DocumentCard';
 import { EmptyState } from './EmptyState';
+import { LibraryTable } from './LibraryTable';
 import { useLibrary } from './LibraryProvider';
 import { PasteTextDialog } from './PasteTextDialog';
 import { RenameDialog } from './RenameDialog';
 import { type NavKey, Sidebar } from './Sidebar';
+
+type LibraryView = 'grid' | 'list';
+const VIEW_STORAGE_KEY = 'lingxi-library-view';
 
 interface LibraryScreenProps {
   onOpenDocument: (documentId: string) => void;
@@ -27,7 +31,16 @@ export function LibraryScreen({ onOpenDocument, onNavigate }: LibraryScreenProps
   const [renamingDoc, setRenamingDoc] = useState<LingxiDocument | null>(null);
   const [deletingDoc, setDeletingDoc] = useState<LingxiDocument | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [view, setView] = useState<LibraryView>(() => {
+    const stored = localStorage.getItem(VIEW_STORAGE_KEY);
+    return stored === 'grid' || stored === 'list' ? stored : 'list';
+  });
   const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  function changeView(next: LibraryView) {
+    setView(next);
+    localStorage.setItem(VIEW_STORAGE_KEY, next);
+  }
 
   async function refresh() {
     if (!repository) return;
@@ -36,11 +49,11 @@ export function LibraryScreen({ onOpenDocument, onNavigate }: LibraryScreenProps
       docs.map(async (doc): Promise<DocumentCardData> => {
         const cursor = await repository.getCursor(doc.id);
         const lastPage = doc.structure.pages.at(-1);
-        const totalLength = lastPage ? lastPage.charEnd : 0;
-        const progress = cursor ? computeProgress(cursor.charOffset, totalLength) : 0;
+        const totalChars = lastPage ? lastPage.charEnd : 0;
+        const progress = cursor ? computeProgress(cursor.charOffset, totalChars) : 0;
         const totalPages = doc.structure.pages.length;
         const currentPage = cursor && totalPages > 1 ? cursor.pageIndex + 1 : null;
-        return { doc, progress, currentPage, totalPages };
+        return { doc, progress, currentPage, totalPages, charOffset: cursor?.charOffset ?? 0, totalChars };
       }),
     );
     setCards(data);
@@ -101,13 +114,6 @@ export function LibraryScreen({ onOpenDocument, onNavigate }: LibraryScreenProps
     return cards.filter((c) => c.doc.title.toLowerCase().includes(q));
   }, [cards, query]);
 
-  const continueReading = useMemo(() => {
-    if (query.trim()) return null;
-    const inProgress = (cards ?? []).filter((c) => c.progress > 0 && c.progress < 1);
-    if (inProgress.length === 0) return null;
-    return inProgress.reduce((a, b) => (a.doc.lastOpenedAt > b.doc.lastOpenedAt ? a : b));
-  }, [cards, query]);
-
   const hiddenPdfInput = (
     <input
       ref={pdfInputRef}
@@ -166,48 +172,56 @@ export function LibraryScreen({ onOpenDocument, onNavigate }: LibraryScreenProps
         ) : cards.length === 0 ? (
           <EmptyState onImportPdf={() => pdfInputRef.current?.click()} onPasteText={() => setPasteDialogOpen(true)} />
         ) : (
-          <>
-            {continueReading && (
-              <section>
-                <div className="library-section-header">
-                  <h2 className="library-section-title">Continue Reading</h2>
-                </div>
-                <DocumentCard
-                  data={continueReading}
-                  featured
-                  onOpen={() => onOpenDocument(continueReading.doc.id)}
-                  onRename={() => setRenamingDoc(continueReading.doc)}
-                  onDelete={() => setDeletingDoc(continueReading.doc)}
-                />
-              </section>
-            )}
-
-            <section>
-              <div className="library-section-header">
-                <h2 className="library-section-title">{query.trim() ? 'Results' : 'All Documents'}</h2>
-                <AddMenu onImportPdf={() => pdfInputRef.current?.click()} onPasteText={() => setPasteDialogOpen(true)} />
+          <section>
+            <div className="library-section-header">
+              <h1 className="library-section-title">Library</h1>
+              <div className="library-view-toggle" role="group" aria-label="Library view">
+                <button
+                  type="button"
+                  className={`btn btn-icon${view === 'grid' ? ' is-active' : ''}`}
+                  aria-label="Grid view"
+                  onClick={() => changeView('grid')}
+                >
+                  <GridIcon />
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-icon${view === 'list' ? ' is-active' : ''}`}
+                  aria-label="List view"
+                  onClick={() => changeView('list')}
+                >
+                  <ListIcon />
+                </button>
               </div>
+              <AddMenu onImportPdf={() => pdfInputRef.current?.click()} onPasteText={() => setPasteDialogOpen(true)} />
+            </div>
 
-              {error && <p className="error-message">{error}</p>}
-              {importingPdf && <p className="status-message">Importing…</p>}
+            {error && <p className="error-message">{error}</p>}
+            {importingPdf && <p className="status-message">Importing…</p>}
 
-              {filtered.length === 0 ? (
-                <p className="status-message">No documents match "{query}".</p>
-              ) : (
-                <div className="document-grid">
-                  {filtered.map((card) => (
-                    <DocumentCard
-                      key={card.doc.id}
-                      data={card}
-                      onOpen={() => onOpenDocument(card.doc.id)}
-                      onRename={() => setRenamingDoc(card.doc)}
-                      onDelete={() => setDeletingDoc(card.doc)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          </>
+            {filtered.length === 0 ? (
+              <p className="status-message">No documents match "{query}".</p>
+            ) : view === 'grid' ? (
+              <div className="document-grid">
+                {filtered.map((card) => (
+                  <DocumentCard
+                    key={card.doc.id}
+                    data={card}
+                    onOpen={() => onOpenDocument(card.doc.id)}
+                    onRename={() => setRenamingDoc(card.doc)}
+                    onDelete={() => setDeletingDoc(card.doc)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <LibraryTable
+                cards={filtered}
+                onOpenDocument={onOpenDocument}
+                onRename={setRenamingDoc}
+                onDelete={setDeletingDoc}
+              />
+            )}
+          </section>
         )}
       </div>
 

@@ -7,6 +7,8 @@ export interface DocumentCardData {
   progress: number; // 0..1
   currentPage: number | null; // 1-indexed, null if not applicable (single implicit page)
   totalPages: number;
+  charOffset: number;
+  totalChars: number;
 }
 
 interface DocumentCardProps {
