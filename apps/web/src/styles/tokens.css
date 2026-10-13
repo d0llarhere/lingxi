@@ -12,11 +12,11 @@
   --text-primary: #211f1c;
   --text-secondary: #6b6459;
   --text-tertiary: #948d80;
-  --border: #e6e1d6;
+  --border: #ddd6c8;
   --border-strong: #d3ccbc;
-  --accent: #3f6657;
+  --accent: #3f8268;
   --accent-hover: #325146;
-  --accent-soft: #e4ede9;
+  --accent-soft: #dcf0e6;
   --accent-contrast: #ffffff;
   --highlight: #ffe58f;
   --highlight-text: #211f1c;
@@ -24,6 +24,24 @@
   --danger-hover: #8c362e;
   --danger-soft: #f6e6e4;
   --focus-ring: 0 0 0 3px rgba(63, 102, 87, 0.35);
+
+  /* Pill player / sidebar library redesign (lingxi-redesign/REDESIGN_BRIEF.md).
+     Net-new tokens alongside the ones above — --surface/--border/--accent/
+     --accent-soft above were refined in place rather than duplicated under a
+     second name, since the brief's values are a close variant of the same
+     palette and every existing surface (dialogs, menus, old TOC sidebar)
+     already reads from those same four names; introducing a parallel
+     --surface-2-but-really-the-same-idea token would just be confusing. */
+  --bg: #f7f5f1;
+  --bg-sunken: #efebe4;
+  --surface-2: #eeeae3;
+  --divider: #e4ded2;
+  --text: #211f1c;
+  --text-muted: #6b6459;
+  --on-accent: #ffffff;
+  --warn: #9a7a2e;
+  --highlight-sentence: rgba(63, 130, 104, 0.1);
+  --highlight-word: rgba(63, 130, 104, 0.3);
 
   --shadow-sm: 0 1px 2px rgba(33, 31, 28, 0.06);
   --shadow-md: 0 6px 16px rgba(33, 31, 28, 0.08);
@@ -73,11 +91,11 @@
   --text-primary: #eae7e0;
   --text-secondary: #a9a49a;
   --text-tertiary: #7d7970;
-  --border: #33373a;
+  --border: #363b3d;
   --border-strong: #454a4d;
-  --accent: #7fbfa5;
+  --accent: #7cc4a8;
   --accent-hover: #98d0b8;
-  --accent-soft: #22322c;
+  --accent-soft: #263b33;
   --accent-contrast: #0d1512;
   --highlight: #4d3f17;
   --highlight-text: #ffdf8a;
@@ -89,6 +107,17 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+
+  --bg: #1b1d1e;
+  --bg-sunken: #181a1b;
+  --surface-2: #2f3436;
+  --divider: #33383a;
+  --text: #e4e6e7;
+  --text-muted: #9aa0a3;
+  --on-accent: #11241c;
+  --warn: #e8c98a;
+  --highlight-sentence: rgba(124, 196, 168, 0.12);
+  --highlight-word: rgba(124, 196, 168, 0.34);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -102,11 +131,11 @@
     --text-primary: #eae7e0;
     --text-secondary: #a9a49a;
     --text-tertiary: #7d7970;
-    --border: #33373a;
+    --border: #363b3d;
     --border-strong: #454a4d;
-    --accent: #7fbfa5;
+    --accent: #7cc4a8;
     --accent-hover: #98d0b8;
-    --accent-soft: #22322c;
+    --accent-soft: #263b33;
     --accent-contrast: #0d1512;
     --highlight: #4d3f17;
     --highlight-text: #ffdf8a;
@@ -118,6 +147,17 @@
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.35);
     --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+
+    --bg: #1b1d1e;
+    --bg-sunken: #181a1b;
+    --surface-2: #2f3436;
+    --divider: #33383a;
+    --text: #e4e6e7;
+    --text-muted: #9aa0a3;
+    --on-accent: #11241c;
+    --warn: #e8c98a;
+    --highlight-sentence: rgba(124, 196, 168, 0.12);
+    --highlight-word: rgba(124, 196, 168, 0.34);
   }
 }
 
