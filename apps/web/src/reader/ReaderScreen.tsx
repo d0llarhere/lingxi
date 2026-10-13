@@ -22,7 +22,6 @@ import { offlineDownloader } from '../tts/offlineDownload';
 import { KOKORO_VOICE_PREFIX } from '../tts/kokoro/KokoroTTSEngine';
 import { edgeEngine, kokoroEngine, ttsEngine, webSpeechEngine } from '../tts/ttsEngineInstance';
 import { ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 } from './formatDuration';
-import { PlaybackControls } from './PlaybackControls';
 import { PlaybackPill } from './PlaybackPill';
 import type { SleepTimerChoice } from './PlaybackMenu';
 import { ReaderHeader } from './ReaderHeader';
@@ -30,11 +29,6 @@ import { SearchBar } from './SearchBar';
 import { TocSidebar, type TocEntry } from './TocSidebar';
 import { useReaderShortcuts } from './useReaderShortcuts';
 import { WordText, type WordTextHandle } from './WordText';
-
-// Pill player is being built alongside the existing bottom bar so each piece
-// is testable on its own before PlaybackControls is deleted (see
-// lingxi-redesign/REDESIGN_BRIEF.md's commit sequence, [pill-cleanup]).
-const SHOW_PILL = true;
 
 interface ReaderScreenProps {
   documentId: string;
@@ -581,6 +575,12 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
             </div>
           ) : (
             <>
+              {voiceURI?.startsWith(EDGE_VOICE_PREFIX) && ariaWakeStatus === 'waking' && (
+                <p className="approximate-note">Waking up Aria… the server went idle and takes up to a minute to start.</p>
+              )}
+              {approximateHighlighting && (
+                <p className="approximate-note">Word highlighting is approximate on this browser/voice.</p>
+              )}
               <div className="reading-surface">
                 <WordText
                   ref={wordTextRef}
@@ -591,75 +591,44 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
                   onWordClick={handleWordClick}
                 />
               </div>
-              <PlaybackControls
-                state={playbackState}
-                progress={progress}
-                rate={rate}
-                voices={voices}
-                voicesLoading={voicesLoading}
-                voiceURI={voiceURI}
-                kokoroStatus={kokoroStatus}
-                offlineDownloadStatus={offlineDownloadStatus}
-                ariaWakeStatus={ariaWakeStatus}
-                cacheStatus={cacheStatus}
-                approximateHighlighting={approximateHighlighting}
-                currentPage={currentPage}
-                totalPages={totalPages}
-                currentCharOffset={currentCharOffset}
-                totalChars={totalChars}
-                onPlay={() => controllerRef.current?.play()}
-                onPause={() => controllerRef.current?.pause()}
-                onStop={() => controllerRef.current?.stop()}
-                onPrevious={() => controllerRef.current?.previousSentence()}
-                onNext={() => controllerRef.current?.nextSentence()}
-                onRateChange={handleRateChange}
-                onVoiceChange={(value) => {
-                  setVoiceURI(value);
-                  controllerRef.current?.setVoice(value);
-                }}
-                onDownloadKokoro={handleDownloadKokoro}
-                onDownloadOffline={handleDownloadOffline}
-                onExportAudio={handleExportAudio}
-                onExportSrt={handleExportSrt}
-                onSeek={(fraction) => controllerRef.current?.seekToProgress(fraction)}
-              />
-              {SHOW_PILL && (
-                <div className="pill-dock">
-                  <PlaybackPill
-                    state={playbackState}
-                    progress={pillProgress}
-                    rate={rate}
-                    chapterNumber={currentChapter?.number ?? null}
-                    chapterTitle={currentChapter?.title ?? null}
-                    paragraphNumber={currentParagraphIndex + 1}
-                    totalParagraphs={totalParagraphs}
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    remainingInChapterSeconds={remainingInChapterSeconds}
-                    menuOpen={pillMenuOpen}
-                    onToggleMenu={() => setPillMenuOpen((open) => !open)}
-                    onCloseMenu={() => setPillMenuOpen(false)}
-                    onPlay={() => controllerRef.current?.play()}
-                    onPause={() => controllerRef.current?.pause()}
-                    onPrevious={() => controllerRef.current?.previousParagraph()}
-                    onNext={() => controllerRef.current?.nextParagraph()}
-                    onRateChange={handleRateChange}
-                    voices={voices}
-                    voiceURI={voiceURI}
-                    onVoiceChange={(value) => {
-                      setVoiceURI(value);
-                      controllerRef.current?.setVoice(value);
-                    }}
-                    onPreviewVoice={handlePreviewVoice}
-                    sleepTimerLabel={sleepTimer?.label ?? 'Off'}
-                    onSetSleepTimer={handleSetSleepTimer}
-                    kokoroStatus={kokoroStatus}
-                    onDownloadKokoro={handleDownloadKokoro}
-                    offlineDownloadStatus={offlineDownloadStatus}
-                    onDownloadOffline={handleDownloadOffline}
-                  />
-                </div>
-              )}
+              <div className="pill-dock">
+                <PlaybackPill
+                  state={playbackState}
+                  progress={pillProgress}
+                  rate={rate}
+                  chapterNumber={currentChapter?.number ?? null}
+                  chapterTitle={currentChapter?.title ?? null}
+                  paragraphNumber={currentParagraphIndex + 1}
+                  totalParagraphs={totalParagraphs}
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  remainingInChapterSeconds={remainingInChapterSeconds}
+                  menuOpen={pillMenuOpen}
+                  onToggleMenu={() => setPillMenuOpen((open) => !open)}
+                  onCloseMenu={() => setPillMenuOpen(false)}
+                  onPlay={() => controllerRef.current?.play()}
+                  onPause={() => controllerRef.current?.pause()}
+                  onPrevious={() => controllerRef.current?.previousParagraph()}
+                  onNext={() => controllerRef.current?.nextParagraph()}
+                  onRateChange={handleRateChange}
+                  voices={voices}
+                  voiceURI={voiceURI}
+                  onVoiceChange={(value) => {
+                    setVoiceURI(value);
+                    controllerRef.current?.setVoice(value);
+                  }}
+                  onPreviewVoice={handlePreviewVoice}
+                  sleepTimerLabel={sleepTimer?.label ?? 'Off'}
+                  onSetSleepTimer={handleSetSleepTimer}
+                  kokoroStatus={kokoroStatus}
+                  onDownloadKokoro={handleDownloadKokoro}
+                  offlineDownloadStatus={offlineDownloadStatus}
+                  onDownloadOffline={handleDownloadOffline}
+                  cacheStatus={cacheStatus}
+                  onExportAudio={handleExportAudio}
+                  onExportSrt={handleExportSrt}
+                />
+              </div>
             </>
           )}
         </div>

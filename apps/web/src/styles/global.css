@@ -148,25 +148,6 @@ a {
   height: 20px;
 }
 
-.btn-play {
-  min-height: 56px;
-  min-width: 56px;
-  padding: 0;
-  border-radius: var(--radius-full);
-  background: var(--accent);
-  color: var(--accent-contrast);
-  box-shadow: var(--shadow-md);
-}
-
-.btn-play:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.btn-play svg {
-  width: 24px;
-  height: 24px;
-}
-
 /* ---------- Inputs ---------- */
 
 .field {

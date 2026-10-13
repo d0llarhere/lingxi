@@ -42,6 +42,9 @@ export interface PlaybackPillProps {
   onDownloadKokoro: () => void;
   offlineDownloadStatus: OfflineDownloadSnapshot;
   onDownloadOffline: () => void;
+  cacheStatus: { fullyCached: boolean; allAria: boolean } | null;
+  onExportAudio: () => void;
+  onExportSrt: () => void;
 }
 
 function cycleSpeed(current: number): number {
@@ -137,6 +140,9 @@ export function PlaybackPill({
   onDownloadKokoro,
   offlineDownloadStatus,
   onDownloadOffline,
+  cacheStatus,
+  onExportAudio,
+  onExportSrt,
 }: PlaybackPillProps) {
   const isPlaying = state === 'playing';
   const isPaused = state === 'paused';
@@ -176,6 +182,9 @@ export function PlaybackPill({
             onDownloadKokoro={onDownloadKokoro}
             offlineDownloadStatus={offlineDownloadStatus}
             onDownloadOffline={onDownloadOffline}
+            cacheStatus={cacheStatus}
+            onExportAudio={onExportAudio}
+            onExportSrt={onExportSrt}
           />
         </div>
       )}

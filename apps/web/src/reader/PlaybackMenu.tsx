@@ -39,6 +39,11 @@ interface PlaybackMenuProps {
   onDownloadKokoro: () => void;
   offlineDownloadStatus: OfflineDownloadSnapshot;
   onDownloadOffline: () => void;
+  // Only offered once the whole book is cached for the selected voice (see
+  // CachingTTSEngine) — same gating the old PlaybackControls bar used.
+  cacheStatus: { fullyCached: boolean; allAria: boolean } | null;
+  onExportAudio: () => void;
+  onExportSrt: () => void;
 }
 
 type MenuView = 'main' | 'voice' | 'sleep';
@@ -61,6 +66,9 @@ export function PlaybackMenu({
   onDownloadKokoro,
   offlineDownloadStatus,
   onDownloadOffline,
+  cacheStatus,
+  onExportAudio,
+  onExportSrt,
 }: PlaybackMenuProps) {
   const [view, setView] = useState<MenuView>('main');
   const [kokoroCancelled, setKokoroCancelled] = useState(false);
@@ -191,6 +199,24 @@ export function PlaybackMenu({
                   <div className="pill-mi-progress-fill" style={{ width: `${offlineDownloadStatus.progress * 100}%` }} />
                 </div>
               )}
+            </button>
+          )}
+
+          {isCacheableVoice && cacheStatus?.fullyCached && (
+            <button type="button" role="menuitem" className="pill-mi" onClick={onExportAudio}>
+              <span className="pill-mi-icon">
+                <DownloadIcon width={16} height={16} />
+              </span>
+              <span className="pill-mi-text">Export {cacheStatus.allAria ? 'MP3' : 'WAV'}</span>
+            </button>
+          )}
+
+          {isCacheableVoice && cacheStatus?.fullyCached && cacheStatus.allAria && (
+            <button type="button" role="menuitem" className="pill-mi" onClick={onExportSrt}>
+              <span className="pill-mi-icon">
+                <DownloadIcon width={16} height={16} />
+              </span>
+              <span className="pill-mi-text">Export subtitles (.srt)</span>
             </button>
           )}
 
