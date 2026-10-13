@@ -2,7 +2,7 @@ import { computeProgress, type LingxiDocument } from '@lingxi/core';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { AppShell } from '../components/AppShell';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { SearchIcon } from '../components/icons';
+import { ListIcon, SearchIcon } from '../components/icons';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { AddMenu } from './AddMenu';
 import { DocumentCard, type DocumentCardData } from './DocumentCard';
@@ -10,12 +10,14 @@ import { EmptyState } from './EmptyState';
 import { useLibrary } from './LibraryProvider';
 import { PasteTextDialog } from './PasteTextDialog';
 import { RenameDialog } from './RenameDialog';
+import { type NavKey, Sidebar } from './Sidebar';
 
 interface LibraryScreenProps {
   onOpenDocument: (documentId: string) => void;
+  onNavigate: (nav: NavKey) => void;
 }
 
-export function LibraryScreen({ onOpenDocument }: LibraryScreenProps) {
+export function LibraryScreen({ onOpenDocument, onNavigate }: LibraryScreenProps) {
   const { repository, ready } = useLibrary();
   const [cards, setCards] = useState<DocumentCardData[] | null>(null);
   const [query, setQuery] = useState('');
@@ -24,6 +26,7 @@ export function LibraryScreen({ onOpenDocument }: LibraryScreenProps) {
   const [pasteDialogOpen, setPasteDialogOpen] = useState(false);
   const [renamingDoc, setRenamingDoc] = useState<LingxiDocument | null>(null);
   const [deletingDoc, setDeletingDoc] = useState<LingxiDocument | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -118,11 +121,24 @@ export function LibraryScreen({ onOpenDocument }: LibraryScreenProps) {
   );
 
   return (
-    <AppShell
+    <div className="app-shell-with-sidebar">
+      <Sidebar active="library" onNavigate={onNavigate} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="app-shell-content">
+      <AppShell
       start={
-        <span className="brand">
-          <span className="brand-mark">灵</span>Lingxi
-        </span>
+        <>
+          <button
+            type="button"
+            className="btn btn-icon sidebar-toggle"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open navigation"
+          >
+            <ListIcon />
+          </button>
+          <span className="brand">
+            <span className="brand-mark">灵</span>Lingxi
+          </span>
+        </>
       }
       end={
         <>
@@ -215,6 +231,8 @@ export function LibraryScreen({ onOpenDocument }: LibraryScreenProps) {
           onCancel={() => setDeletingDoc(null)}
         />
       )}
-    </AppShell>
+      </AppShell>
+      </div>
+    </div>
   );
 }
