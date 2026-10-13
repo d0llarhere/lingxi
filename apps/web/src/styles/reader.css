@@ -281,6 +281,17 @@
   gap: 12px;
 }
 
+.pill-anchor {
+  position: relative;
+}
+
+.pill-menu-anchor {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  transform: translateX(-50%);
+}
+
 .pill {
   height: 64px;
   background: color-mix(in srgb, var(--surface) 94%, transparent);
@@ -419,6 +430,278 @@
 @media (prefers-reduced-motion: reduce) {
   .pill {
     transition: none;
+  }
+}
+
+/* Pill menu — opens upward, anchored above the ⋯ button. */
+
+.pill-menu {
+  width: 336px;
+  max-width: calc(100vw - 32px);
+  max-height: min(70vh, 480px);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
+  padding: 8px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+}
+
+.pill-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 12px;
+}
+
+.pill-menu-row-label {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pill-step-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunken);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.pill-step-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pill-step-value {
+  width: 58px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.pill-mi {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: 600 14px var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+  position: relative;
+  flex-wrap: wrap;
+}
+
+.pill-mi:hover {
+  background: var(--surface-2);
+}
+
+/* The inner "select" button for a voice row that also has a sibling
+   preview button — see PlaybackMenu.tsx's comment on why this can't be one
+   nested button. Fills the row except the preview button's own width. */
+.pill-mi-select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.pill-mi-selected {
+  background: var(--accent-soft);
+}
+
+.pill-mi-static {
+  cursor: default;
+}
+
+.pill-mi-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pill-mi-avatar {
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pill-mi-icon-warn {
+  background: color-mix(in srgb, var(--warn) 22%, transparent);
+  color: var(--warn);
+}
+
+.pill-mi-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pill-mi-sub {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.pill-mi-chevron {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.pill-mi-action {
+  flex-shrink: 0;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: 600 12px var(--font-ui);
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.pill-mi-action-warn {
+  border: 0;
+  background: var(--warn);
+  color: var(--background);
+  font-weight: 700;
+}
+
+.pill-mi-progress {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--divider);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.pill-mi-progress-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.pill-mi-progress-warn .pill-mi-progress-fill {
+  background: var(--warn);
+}
+
+.pill-menu-divider {
+  height: 1px;
+  background: var(--divider);
+  margin: 6px 4px;
+  flex-shrink: 0;
+}
+
+.pill-menu-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 8px 12px 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pill-kbd {
+  font: 600 11px var(--font-ui);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 1px 6px;
+  background: var(--bg-sunken);
+}
+
+.pill-menu-subheader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 8px;
+}
+
+.pill-menu-subheader-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pill-back-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.pill-back-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.pill-preview-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.pill-preview-btn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+@media (max-width: 420px) {
+  .pill-menu {
+    width: calc(100vw - 32px);
   }
 }
 

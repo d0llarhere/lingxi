@@ -17,12 +17,14 @@ import { exportSrt } from '../export/exportSrt';
 import { triggerDownload } from '../export/triggerDownload';
 import { useLibrary } from '../library/LibraryProvider';
 import { RenameDialog } from '../library/RenameDialog';
-import { ariaWakeTracker } from '../tts/edge/EdgeTTSEngine';
+import { ariaWakeTracker, EDGE_VOICE_PREFIX } from '../tts/edge/EdgeTTSEngine';
 import { offlineDownloader } from '../tts/offlineDownload';
-import { kokoroEngine, ttsEngine } from '../tts/ttsEngineInstance';
+import { KOKORO_VOICE_PREFIX } from '../tts/kokoro/KokoroTTSEngine';
+import { edgeEngine, kokoroEngine, ttsEngine, webSpeechEngine } from '../tts/ttsEngineInstance';
 import { ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 } from './formatDuration';
 import { PlaybackControls } from './PlaybackControls';
 import { PlaybackPill } from './PlaybackPill';
+import type { SleepTimerChoice } from './PlaybackMenu';
 import { ReaderHeader } from './ReaderHeader';
 import { SearchBar } from './SearchBar';
 import { TocSidebar, type TocEntry } from './TocSidebar';
@@ -79,6 +81,12 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
   const [currentCharOffset, setCurrentCharOffset] = useState(0);
   const [currentParagraphIndex, setCurrentParagraphIndex] = useState(0);
   const [pillMenuOpen, setPillMenuOpen] = useState(false);
+  // Reading-session only, not persisted (brief: resets on document switch) —
+  // either a fixed duration from the moment it's set, or "pause once the
+  // chapter active when it was set is no longer the current one".
+  const [sleepTimer, setSleepTimer] = useState<
+    { type: 'minutes'; label: string; firesAt: number } | { type: 'end-of-chapter'; label: string; chapterNumberAtSet: number } | null
+  >(null);
   const [kokoroStatus, setKokoroStatus] = useState(kokoroEngine.getStatusSnapshot());
   const [offlineDownloadStatus, setOfflineDownloadStatus] = useState(offlineDownloader.getStatusSnapshot());
   const [ariaWakeStatus, setAriaWakeStatus] = useState(ariaWakeTracker.getStatus());
@@ -107,6 +115,77 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
     if (!loaded || !voiceURI) return;
     void offlineDownloader.download(loaded.doc, loaded.text, voiceURI, rate);
   }, [loaded, voiceURI, rate]);
+
+  // Raw chapter detection, memoized once (detectChapters scans the whole
+  // document text) and shared by the TOC fallback and the pill player's
+  // "current chapter" derivation below — one scan, two consumers. Defined
+  // early (ahead of handleSetSleepTimer, which closes over currentChapter)
+  // rather than down near tocEntries, which only needs `chapters` itself.
+  const chapters = useMemo<ChapterRef[]>(() => (loaded ? detectChapters(loaded.text) : []), [loaded]);
+
+  // The chapter containing the current cursor position, plus where it ends
+  // (the next chapter's start, or end-of-document for the last one) — the
+  // pill player's "Ch. {n} · {title}" line, its chapter-scoped progress
+  // ring/remaining-time, and the "end of chapter" sleep timer all derive
+  // from this. null when detectChapters found nothing (pill falls back to a
+  // paragraph count instead).
+  const currentChapter = useMemo(() => {
+    if (chapters.length === 0) return null;
+    let index = -1;
+    for (let i = 0; i < chapters.length; i++) {
+      if (chapters[i]!.charStart <= currentCharOffset) index = i;
+      else break;
+    }
+    if (index === -1) return null;
+    const totalChars = loaded?.doc.structure.pages.at(-1)?.charEnd ?? 0;
+    return {
+      number: index + 1,
+      title: chapters[index]!.title,
+      charStart: chapters[index]!.charStart,
+      nextCharStart: chapters[index + 1]?.charStart ?? totalChars,
+    };
+  }, [chapters, currentCharOffset, loaded]);
+
+  const handleSetSleepTimer = useCallback(
+    (choice: SleepTimerChoice) => {
+      if (choice === 'off') {
+        setSleepTimer(null);
+        return;
+      }
+      if (choice === 'end-of-chapter') {
+        if (!currentChapter) return; // no chapters detected — option shouldn't be reachable, but guard anyway
+        setSleepTimer({ type: 'end-of-chapter', label: 'End of chapter', chapterNumberAtSet: currentChapter.number });
+        return;
+      }
+      setSleepTimer({ type: 'minutes', label: `${choice} min`, firesAt: Date.now() + choice * 60_000 });
+    },
+    [currentChapter],
+  );
+
+  // Fixed-duration sleep timer: pauses once the deadline passes. Re-armed
+  // whenever sleepTimer changes (a new choice, or cleared via "Off").
+  useEffect(() => {
+    if (!sleepTimer || sleepTimer.type !== 'minutes') return;
+    const msRemaining = sleepTimer.firesAt - Date.now();
+    const handle = window.setTimeout(() => {
+      controllerRef.current?.pause();
+      setSleepTimer(null);
+    }, Math.max(0, msRemaining));
+    return () => window.clearTimeout(handle);
+  }, [sleepTimer]);
+
+  // "End of chapter" sleep timer: pauses the instant the cursor crosses into
+  // a chapter other than the one active when the timer was set — checked
+  // whenever the derived current chapter changes (i.e. on every confirmed
+  // word-boundary cursor update), not on a poll/interval.
+  useEffect(() => {
+    if (!sleepTimer || sleepTimer.type !== 'end-of-chapter') return;
+    if (currentChapter && currentChapter.number !== sleepTimer.chapterNumberAtSet) {
+      controllerRef.current?.pause();
+      setSleepTimer(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentChapter?.number]);
 
   // Whether every sentence (at the current voice+rate) is already cached,
   // and whether all of it is Aria specifically (gates SRT, which needs real
@@ -149,6 +228,45 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
     const result = await exportSrt(loaded.doc, loaded.text, voiceURI, rate);
     if (result) triggerDownload(result.blob, result.filename);
   }, [loaded, voiceURI, rate]);
+
+  // The currently-previewing engine, so a second preview click (same or
+  // different voice) stops whichever one is still speaking before starting
+  // the next — each engine's own speak() already self-cancels a prior
+  // utterance on the *same* engine, but not across engines.
+  const activePreviewEngineRef = useRef<{ cancel: () => void } | null>(null);
+
+  const handlePreviewVoice = useCallback(
+    (previewVoiceURI: string) => {
+      // Previewing is a real, separate playback action (not a derived
+      // value) — see lingxi-redesign/REDESIGN_BRIEF.md's decision notes.
+      // Pausing real playback first (same path the Pause button uses) keeps
+      // PlaybackController's own state consistent; a raw engine.speak()
+      // call would otherwise silently hijack the actual reading audio
+      // without the controller ever finding out, leaving it stuck
+      // believing it's still 'playing' once the preview ends.
+      if (controllerRef.current?.getState() === 'playing') controllerRef.current.pause();
+      activePreviewEngineRef.current?.cancel();
+
+      const engine = previewVoiceURI.startsWith(KOKORO_VOICE_PREFIX)
+        ? kokoroEngine
+        : previewVoiceURI.startsWith(EDGE_VOICE_PREFIX)
+          ? edgeEngine
+          : webSpeechEngine;
+      activePreviewEngineRef.current = engine;
+      engine.speak('This is a preview of this voice, reading at a normal pace.', {
+        voiceURI: previewVoiceURI,
+        rate: 1,
+        onWordBoundary: () => {},
+        onEnd: () => {
+          if (activePreviewEngineRef.current === engine) activePreviewEngineRef.current = null;
+        },
+        onError: () => {
+          if (activePreviewEngineRef.current === engine) activePreviewEngineRef.current = null;
+        },
+      });
+    },
+    [],
+  );
 
   // Load the document, its text, the persisted reading cursor, and playback
   // settings (voice/speed) together, before anything playback-related is
@@ -251,11 +369,6 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repository, loaded?.doc.id]);
 
-  // Raw chapter detection, memoized once (detectChapters scans the whole
-  // document text) and shared by the TOC fallback below and the pill
-  // player's "current chapter" derivation — one scan, two consumers.
-  const chapters = useMemo<ChapterRef[]>(() => (loaded ? detectChapters(loaded.text) : []), [loaded]);
-
   // Chapters first; if none were detected (no recognizable headers — true
   // for most pasted text, and for PDFs without a clear "Chapter N" style),
   // fall back to one entry per PDF page so the TOC is never empty for a
@@ -271,28 +384,6 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
     }
     return [];
   }, [loaded, chapters]);
-
-  // The chapter containing the current cursor position, plus where it ends
-  // (the next chapter's start, or end-of-document for the last one) — the
-  // pill player's "Ch. {n} · {title}" line and its chapter-scoped progress
-  // ring/remaining-time both derive from this. null when detectChapters
-  // found nothing (pill falls back to a paragraph count instead).
-  const currentChapter = useMemo(() => {
-    if (chapters.length === 0) return null;
-    let index = -1;
-    for (let i = 0; i < chapters.length; i++) {
-      if (chapters[i]!.charStart <= currentCharOffset) index = i;
-      else break;
-    }
-    if (index === -1) return null;
-    const totalChars = loaded?.doc.structure.pages.at(-1)?.charEnd ?? 0;
-    return {
-      number: index + 1,
-      title: chapters[index]!.title,
-      charStart: chapters[index]!.charStart,
-      nextCharStart: chapters[index + 1]?.charStart ?? totalChars,
-    };
-  }, [chapters, currentCharOffset, loaded]);
 
   const handleTocSelect = useCallback(
     (charStart: number) => {
@@ -532,6 +623,7 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
                     remainingInChapterSeconds={remainingInChapterSeconds}
                     menuOpen={pillMenuOpen}
                     onToggleMenu={() => setPillMenuOpen((open) => !open)}
+                    onCloseMenu={() => setPillMenuOpen(false)}
                     onPlay={() => controllerRef.current?.play()}
                     onPause={() => controllerRef.current?.pause()}
                     onPrevious={() => controllerRef.current?.previousParagraph()}
@@ -540,6 +632,19 @@ export function ReaderScreen({ documentId, onBack }: ReaderScreenProps) {
                       setRate(value);
                       controllerRef.current?.setSpeed(value);
                     }}
+                    voices={voices}
+                    voiceURI={voiceURI}
+                    onVoiceChange={(value) => {
+                      setVoiceURI(value);
+                      controllerRef.current?.setVoice(value);
+                    }}
+                    onPreviewVoice={handlePreviewVoice}
+                    sleepTimerLabel={sleepTimer?.label ?? 'Off'}
+                    onSetSleepTimer={handleSetSleepTimer}
+                    kokoroStatus={kokoroStatus}
+                    onDownloadKokoro={handleDownloadKokoro}
+                    offlineDownloadStatus={offlineDownloadStatus}
+                    onDownloadOffline={handleDownloadOffline}
                   />
                 </div>
               )}

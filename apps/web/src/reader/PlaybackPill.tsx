@@ -1,7 +1,9 @@
-import type { PlaybackState } from '@lingxi/core';
-import { useState } from 'react';
+import type { PlaybackState, VoiceInfo } from '@lingxi/core';
 import { MoreHorizontalIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon } from '../components/icons';
+import type { KokoroStatusSnapshot } from '../tts/kokoro/KokoroTTSEngine';
+import type { OfflineDownloadSnapshot } from '../tts/offlineDownload';
 import { formatDuration } from './formatDuration';
+import { PlaybackMenu, type SleepTimerChoice } from './PlaybackMenu';
 import { useAutoCollapse } from './useAutoCollapse';
 
 export const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 1.75, 2];
@@ -24,11 +26,22 @@ export interface PlaybackPillProps {
   remainingInChapterSeconds: number | null;
   menuOpen: boolean;
   onToggleMenu: () => void;
+  onCloseMenu: () => void;
   onPlay: () => void;
   onPause: () => void;
   onPrevious: () => void;
   onNext: () => void;
   onRateChange: (rate: number) => void;
+  voices: VoiceInfo[];
+  voiceURI: string | null;
+  onVoiceChange: (voiceURI: string | null) => void;
+  onPreviewVoice: (voiceURI: string) => void;
+  sleepTimerLabel: string;
+  onSetSleepTimer: (choice: SleepTimerChoice) => void;
+  kokoroStatus: KokoroStatusSnapshot;
+  onDownloadKokoro: () => void;
+  offlineDownloadStatus: OfflineDownloadSnapshot;
+  onDownloadOffline: () => void;
 }
 
 function cycleSpeed(current: number): number {
@@ -108,11 +121,22 @@ export function PlaybackPill({
   remainingInChapterSeconds,
   menuOpen,
   onToggleMenu,
+  onCloseMenu,
   onPlay,
   onPause,
   onPrevious,
   onNext,
   onRateChange,
+  voices,
+  voiceURI,
+  onVoiceChange,
+  onPreviewVoice,
+  sleepTimerLabel,
+  onSetSleepTimer,
+  kokoroStatus,
+  onDownloadKokoro,
+  offlineDownloadStatus,
+  onDownloadOffline,
 }: PlaybackPillProps) {
   const isPlaying = state === 'playing';
   const isPaused = state === 'paused';
@@ -135,52 +159,73 @@ export function PlaybackPill({
   }
 
   return (
-    <div className="pill">
-      <button type="button" className="pill-icon-btn" onClick={onPrevious} aria-label="Previous paragraph">
-        <PreviousIcon width={18} height={18} />
-      </button>
-      <PlayButton playing={isPlaying} progress={progress} size={48} onClick={isPlaying ? onPause : onPlay} />
-      <button type="button" className="pill-icon-btn" onClick={onNext} aria-label="Next paragraph">
-        <NextIcon width={18} height={18} />
-      </button>
-
-      <div className="pill-divider" />
-
-      <div className="pill-info">
-        <div className="pill-info-line1">
-          {isPaused ? (
-            <>
-              Paused <span className="pill-info-dot">·</span> {positionLabel}
-            </>
-          ) : hasChapters ? (
-            <>
-              {positionLabel} <span className="pill-info-dot">·</span> {chapterTitle}
-            </>
-          ) : (
-            positionLabel
-          )}
+    <div className="pill-anchor">
+      {menuOpen && (
+        <div className="pill-menu-anchor">
+          <PlaybackMenu
+            onClose={onCloseMenu}
+            rate={rate}
+            onRateChange={onRateChange}
+            voices={voices}
+            voiceURI={voiceURI}
+            onVoiceChange={onVoiceChange}
+            onPreviewVoice={onPreviewVoice}
+            sleepTimerLabel={sleepTimerLabel}
+            onSetSleepTimer={onSetSleepTimer}
+            kokoroStatus={kokoroStatus}
+            onDownloadKokoro={onDownloadKokoro}
+            offlineDownloadStatus={offlineDownloadStatus}
+            onDownloadOffline={onDownloadOffline}
+          />
         </div>
-        {line2 && <div className="pill-info-line2">{line2}</div>}
+      )}
+      <div className="pill">
+        <button type="button" className="pill-icon-btn" onClick={onPrevious} aria-label="Previous paragraph">
+          <PreviousIcon width={18} height={18} />
+        </button>
+        <PlayButton playing={isPlaying} progress={progress} size={48} onClick={isPlaying ? onPause : onPlay} />
+        <button type="button" className="pill-icon-btn" onClick={onNext} aria-label="Next paragraph">
+          <NextIcon width={18} height={18} />
+        </button>
+
+        <div className="pill-divider" />
+
+        <div className="pill-info">
+          <div className="pill-info-line1">
+            {isPaused ? (
+              <>
+                Paused <span className="pill-info-dot">·</span> {positionLabel}
+              </>
+            ) : hasChapters ? (
+              <>
+                {positionLabel} <span className="pill-info-dot">·</span> {chapterTitle}
+              </>
+            ) : (
+              positionLabel
+            )}
+          </div>
+          {line2 && <div className="pill-info-line2">{line2}</div>}
+        </div>
+
+        <button
+          type="button"
+          className="pill-speed-chip"
+          onClick={() => onRateChange(cycleSpeed(rate))}
+          aria-label={`Playback speed ${rate}×`}
+        >
+          {rate}×
+        </button>
+
+        <button
+          type="button"
+          className="pill-icon-btn"
+          onClick={onToggleMenu}
+          aria-label="Playback options"
+          aria-expanded={menuOpen}
+        >
+          <MoreHorizontalIcon width={18} height={18} />
+        </button>
       </div>
-
-      <button
-        type="button"
-        className="pill-speed-chip"
-        onClick={() => onRateChange(cycleSpeed(rate))}
-        aria-label={`Playback speed ${rate}×`}
-      >
-        {rate}×
-      </button>
-
-      <button
-        type="button"
-        className="pill-icon-btn"
-        onClick={onToggleMenu}
-        aria-label="Playback options"
-        aria-expanded={menuOpen}
-      >
-        <MoreHorizontalIcon width={18} height={18} />
-      </button>
     </div>
   );
 }
