@@ -340,6 +340,31 @@ export function EqualizerIcon(props: IconProps) {
   );
 }
 
+export function RewindIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 12a8 8 0 1 0 8-8H8M8 1 5 4l3 3" />
+    </svg>
+  );
+}
+
+export function ForwardIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M20 12a8 8 0 1 1-8-8h4M16 1l3 3-3 3" />
+    </svg>
+  );
+}
+
+export function SubtitlesIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M7 12h4M13 12h4M7 15h7" />
+    </svg>
+  );
+}
+
 export function AlertTriangleIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

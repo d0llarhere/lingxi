@@ -1,13 +1,13 @@
-import { detectChapters, type AudioItemRecord } from '@lingxi/core';
-import { useEffect, useState } from 'react';
+import type { AudioItemRecord } from '@lingxi/core';
 import { EditIcon, EqualizerIcon, MusicNoteIcon, PauseIcon, PlayIcon, TrashIcon, UploadIcon } from '../components/icons';
 import { OverflowMenu, type MenuAction } from '../components/OverflowMenu';
+import { formatDuration } from '../reader/formatDuration';
 import { useChapterDetection } from '../settings/useChapterDetection';
 import { EDGE_VOICES } from '../tts/edge/EdgeTTSEngine';
 import { KOKORO_VOICES } from '../tts/kokoro/KokoroTTSEngine';
-import { findChapterAt, thumbColor, thumbInitial } from './DocumentRow';
-import { useLibrary } from './LibraryProvider';
+import { thumbColor, thumbInitial } from './DocumentRow';
 import { formatBytes } from './StorageCard';
+import { useApproxBookPosition } from './useApproxBookPosition';
 
 interface DownloadRowProps {
   item: AudioItemRecord;
@@ -24,14 +24,7 @@ function voiceName(voiceURI: string): string {
   return ALL_VOICES.find((v) => v.voiceURI === voiceURI)?.name ?? voiceURI;
 }
 
-function formatClock(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
-}
-
-function formatDuration(ms: number): string {
+function formatLengthLabel(ms: number): string {
   const totalMinutes = Math.round(ms / 60000);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
@@ -39,32 +32,10 @@ function formatDuration(ms: number): string {
 }
 
 export function DownloadRow({ item, isPlaying, onPlay, onRename, onAttachSubtitles, onDelete }: DownloadRowProps) {
-  const { repository } = useLibrary();
   const { settings: chapterDetection } = useChapterDetection();
-  const [chapter, setChapter] = useState<{ number: number; title: string } | null>(null);
   const percent = item.durationMs > 0 ? Math.round((item.positionMs / item.durationMs) * 100) : 0;
   const color = thumbColor(item.title);
-
-  // Approximates the chapter at the current position from the document's
-  // overall char-count/duration ratio — the same linear chars-per-second
-  // estimate DocumentRow.formatLength already relies on — rather than
-  // persisting a per-chunk time→offset timeline just for this display.
-  useEffect(() => {
-    if (item.kind !== 'book' || !item.documentId || item.positionMs <= 0 || !repository || chapterDetection.mode === 'off') {
-      setChapter(null);
-      return;
-    }
-    let cancelled = false;
-    repository.getDocumentText(item.documentId).then((text) => {
-      if (cancelled || !text) return;
-      const approxCharOffset = Math.round((item.positionMs / item.durationMs) * text.length);
-      const chapters = detectChapters(text, chapterDetection);
-      setChapter(findChapterAt(chapters, approxCharOffset));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [repository, item.kind, item.documentId, item.positionMs, item.durationMs, chapterDetection]);
+  const bookPosition = useApproxBookPosition(item.documentId, item.positionMs, item.durationMs, chapterDetection);
 
   const detailLine =
     item.kind === 'book'
@@ -76,9 +47,9 @@ export function DownloadRow({ item, isPlaying, onPlay, onRename, onAttachSubtitl
   const positionLabel =
     item.positionMs <= 0
       ? 'Not started'
-      : chapter
-        ? `Ch. ${chapter.number} · ${formatClock(item.positionMs)}`
-        : formatClock(item.positionMs);
+      : bookPosition
+        ? `Ch. ${bookPosition.chapterNumber} · ${formatDuration(item.positionMs / 1000)}`
+        : formatDuration(item.positionMs / 1000);
 
   const menuActions: MenuAction[] = [
     { label: 'Rename', icon: <EditIcon />, onSelect: onRename },
@@ -106,7 +77,7 @@ export function DownloadRow({ item, isPlaying, onPlay, onRename, onAttachSubtitl
         </span>
         <span className="doc-row-progress-value">{positionLabel}</span>
       </div>
-      <span className="doc-row-length">{formatDuration(item.durationMs)}</span>
+      <span className="doc-row-length">{formatLengthLabel(item.durationMs)}</span>
       <span className="doc-row-opened">{formatBytes(item.sizeBytes)}</span>
       <div className="doc-row-actions">
         <button

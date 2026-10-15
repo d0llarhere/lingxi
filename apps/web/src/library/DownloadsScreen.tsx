@@ -4,6 +4,7 @@ import { AppShell } from '../components/AppShell';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ListIcon, SearchIcon, SettingsIcon, SortIcon, UploadIcon } from '../components/icons';
 import { OverflowMenu, type MenuAction } from '../components/OverflowMenu';
+import { AudioPill } from '../reader/AudioPill';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { getAudioLibraryRepository } from './audioLibraryInstance';
 import { DownloadRow } from './DownloadRow';
@@ -162,6 +163,8 @@ export function DownloadsScreen({ onNavigate }: DownloadsScreenProps) {
       .slice()
       .sort((a, b) => sortCompare(a, b, sort));
   }, [items, query, filter, sort]);
+
+  const playingItem = items?.find((item) => item.id === playingId) ?? null;
 
   const counts = useMemo(() => {
     if (!items) return { all: 0, book: 0, imported: 0 };
@@ -326,6 +329,12 @@ export function DownloadsScreen({ onNavigate }: DownloadsScreenProps) {
               onConfirm={handleConfirmDelete}
               onCancel={() => setDeletingItem(null)}
             />
+          )}
+
+          {playingItem && (
+            <div className="pill-dock">
+              <AudioPill item={playingItem} onClose={() => setPlayingId(null)} onPersisted={refresh} />
+            </div>
           )}
         </AppShell>
       </div>
