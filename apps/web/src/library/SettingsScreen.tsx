@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ListIcon } from '../components/icons';
+import { AboutSection } from './AboutSection';
 import { AppearanceSection } from './AppearanceSection';
 import { ChaptersSection } from './ChaptersSection';
 import { ListeningSection } from './ListeningSection';
@@ -9,7 +10,7 @@ import { StorageSection } from './StorageSection';
 
 // Nav order per docs/lingxi-part3/BRIEF_SETTINGS_PAGES.md: Reading ·
 // Listening · Chapters · Storage · Appearance · About.
-export type SettingsSection = 'reading' | 'listening' | 'chapters' | 'storage' | 'appearance';
+export type SettingsSection = 'reading' | 'listening' | 'chapters' | 'storage' | 'appearance' | 'about';
 
 const NAV_ITEMS: { key: SettingsSection; label: string }[] = [
   { key: 'reading', label: 'Reading' },
@@ -17,6 +18,7 @@ const NAV_ITEMS: { key: SettingsSection; label: string }[] = [
   { key: 'chapters', label: 'Chapters' },
   { key: 'storage', label: 'Storage' },
   { key: 'appearance', label: 'Appearance' },
+  { key: 'about', label: 'About' },
 ];
 
 interface SettingsScreenProps {
@@ -46,9 +48,6 @@ export function SettingsScreen({ onNavigate, initialSection }: SettingsScreenPro
         <div className="settings-layout">
           <nav aria-label="Settings sections" className="settings-nav">
             <div className="settings-nav-title">Settings</div>
-            {/* About lands here as its own commit — the brief's own rule is
-                to leave undefined sections out of the nav rather than show
-                an empty page. */}
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.key}
@@ -70,6 +69,8 @@ export function SettingsScreen({ onNavigate, initialSection }: SettingsScreenPro
               <StorageSection onOpenLibrary={() => onNavigate('library')} />
             ) : section === 'appearance' ? (
               <AppearanceSection />
+            ) : section === 'about' ? (
+              <AboutSection />
             ) : (
               <ChaptersSection />
             )}
