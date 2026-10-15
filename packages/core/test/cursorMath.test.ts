@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { computeProgress, findWordAtOrBeforeOffset, findWordIndexAtOrAfterOffset } from '../src/playback/cursorMath';
+import {
+  computeProgress,
+  findPageIndexAtOffset,
+  findWordAtOrBeforeOffset,
+  findWordIndexAtOrAfterOffset,
+} from '../src/playback/cursorMath';
+import type { PageRef } from '../src/model/types';
 import { segmentText } from '../src/segmentation/segmentText';
 
 describe('cursorMath', () => {
@@ -62,6 +68,34 @@ describe('cursorMath', () => {
     it('clamps to [0, 1]', () => {
       expect(computeProgress(-10, 100)).toBe(0);
       expect(computeProgress(1000, 100)).toBe(1);
+    });
+  });
+
+  describe('findPageIndexAtOffset', () => {
+    const pages: PageRef[] = [
+      { index: 0, charStart: 0, charEnd: 100 },
+      { index: 1, charStart: 100, charEnd: 200 },
+      { index: 2, charStart: 200, charEnd: 300 },
+    ];
+
+    it('finds the page containing an offset in the middle of it', () => {
+      expect(findPageIndexAtOffset(pages, 150)).toBe(1);
+    });
+
+    it('resolves an offset exactly at a page boundary to that page, not the previous one', () => {
+      expect(findPageIndexAtOffset(pages, 200)).toBe(2);
+    });
+
+    it('returns the first page for an offset before the document starts', () => {
+      expect(findPageIndexAtOffset(pages, -10)).toBe(0);
+    });
+
+    it('returns the last page for an offset past the document end', () => {
+      expect(findPageIndexAtOffset(pages, 10_000)).toBe(2);
+    });
+
+    it('returns 0 for an empty page list', () => {
+      expect(findPageIndexAtOffset([], 50)).toBe(0);
     });
   });
 });

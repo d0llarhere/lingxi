@@ -7,6 +7,11 @@ interface WordTextProps {
   paragraphs: ParagraphRef[];
   initialHighlightWordIndex: number | null;
   onWordClick: (wordIndex: number) => void;
+  // Reports the paragraph nearest the top of the viewport as the user
+  // scrolls — used when the reader isn't playing, so the header/pill can
+  // show what's actually on screen instead of a frozen playback position
+  // (see ReaderScreen's displayCharOffset).
+  onVisibleParagraphChange?: (paragraphIndex: number) => void;
 }
 
 export interface WordTextHandle {
@@ -38,6 +43,10 @@ interface Sentence {
 
 interface Paragraph {
   key: string;
+  // ParagraphRef.index — not the position in this rendered array, which
+  // skips any paragraph with no words (see the build loop below). Needed to
+  // report "the visible paragraph" back to the caller by its real index.
+  index: number;
   sentences: Sentence[];
 }
 
@@ -59,11 +68,12 @@ interface Paragraph {
 // closure per word, which also removes an O(n) allocation on every render.
 export const WordText = memo(
   forwardRef<WordTextHandle, WordTextProps>(function WordText(
-    { text, words, paragraphs: paragraphRefs, initialHighlightWordIndex, onWordClick },
+    { text, words, paragraphs: paragraphRefs, initialHighlightWordIndex, onWordClick, onVisibleParagraphChange },
     ref,
   ) {
     const wordElsRef = useRef<Map<number, HTMLSpanElement>>(new Map());
     const sentenceElsRef = useRef<Map<number, HTMLSpanElement>>(new Map());
+    const paragraphElsRef = useRef<Map<number, HTMLParagraphElement>>(new Map());
     const activeSentenceIndexRef = useRef<number | null>(null);
     const activeIndexRef = useRef<number | null>(null);
     const searchMatchIndicesRef = useRef<Set<number>>(new Set());
@@ -133,11 +143,45 @@ export const WordText = memo(
         }
         flushSentence(paragraphRef.charEnd);
 
-        result.push({ key: `p-${paragraphRef.index}`, sentences });
+        result.push({ key: `p-${paragraphRef.index}`, index: paragraphRef.index, sentences });
       }
 
       return result;
     }, [text, words, paragraphRefs]);
+
+    // Tracks which paragraph is nearest the top of the viewport as the user
+    // scrolls — used by the caller (ReaderScreen) to show what's actually on
+    // screen while not playing, instead of a frozen playback position (see
+    // bug: header/pill showed a stale chapter after opening a document
+    // scrolled to the top while the persisted cursor was deep inside it).
+    // An IntersectionObserver, not a scroll-listener + getBoundingClientRect
+    // — the latter forces synchronous layout on every scroll tick, which
+    // defeats `content-visibility: auto` on this file's own terms (see the
+    // perf note above); IntersectionObserver reports visibility
+    // asynchronously off the render path and composes correctly with
+    // content-visibility instead of forcing it to resolve early.
+    useEffect(() => {
+      if (!onVisibleParagraphChange) return;
+      const visible = new Set<number>();
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            const idx = Number((entry.target as HTMLElement).dataset.paragraphIndex);
+            if (Number.isNaN(idx)) continue;
+            if (entry.isIntersecting) visible.add(idx);
+            else visible.delete(idx);
+          }
+          if (visible.size === 0) return;
+          onVisibleParagraphChange(Math.min(...visible));
+        },
+        // Only the top ~30% of the viewport counts as "the top" — roughly
+        // matches the active-paragraph scroll target used elsewhere
+        // (brief: "about 1/3 from the top").
+        { rootMargin: '0px 0px -70% 0px', threshold: 0 },
+      );
+      for (const el of paragraphElsRef.current.values()) observer.observe(el);
+      return () => observer.disconnect();
+    }, [paragraphs, onVisibleParagraphChange]);
 
     const setActiveWord = (wordIndex: number | null, scroll: boolean) => {
       const prevIndex = activeIndexRef.current;
@@ -256,7 +300,15 @@ export const WordText = memo(
     return (
       <div className="reading-column" onClick={handleClick} onKeyDown={handleKeyDown}>
         {paragraphs.map((paragraph) => (
-          <p key={paragraph.key} className="reading-paragraph">
+          <p
+            key={paragraph.key}
+            className="reading-paragraph"
+            data-paragraph-index={paragraph.index}
+            ref={(el) => {
+              if (el) paragraphElsRef.current.set(paragraph.index, el);
+              else paragraphElsRef.current.delete(paragraph.index);
+            }}
+          >
             {paragraph.sentences.map((sentence) => (
               <span
                 key={sentence.key}

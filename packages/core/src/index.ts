@@ -12,7 +12,12 @@ export type {
 } from './model/types';
 export { extractPdfText } from './extraction/extractPdf';
 export type { PdfExtractionResult } from './extraction/extractPdf';
-export { computeProgress, findWordAtOrBeforeOffset, findWordIndexAtOrAfterOffset } from './playback/cursorMath';
+export {
+  computeProgress,
+  findPageIndexAtOffset,
+  findWordAtOrBeforeOffset,
+  findWordIndexAtOrAfterOffset,
+} from './playback/cursorMath';
 export { calibrateCharsPerSecond, measureCharsPerSecond } from './playback/ttsCalibration';
 export { PlaybackController } from './playback/playbackController';
 export type { PlaybackControllerOptions, PlaybackState } from './playback/playbackController';

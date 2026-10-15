@@ -1,5 +1,6 @@
 import {
   detectChapters,
+  findPageIndexAtOffset,
   findWordIndexAtOrAfterOffset,
   PlaybackController,
   type ChapterRef,
@@ -47,6 +48,32 @@ interface LoadedDocument {
   settings: PlaybackSettings;
 }
 
+interface CurrentChapter {
+  number: number;
+  title: string;
+  charStart: number;
+  nextCharStart: number;
+}
+
+// Shared by both the playback-position chapter (ring/sleep-timer) and the
+// display-position chapter (header/pill text) below — same lookup, two
+// different char offsets.
+function findChapterAt(chapters: ChapterRef[], charOffset: number, totalChars: number): CurrentChapter | null {
+  if (chapters.length === 0) return null;
+  let index = -1;
+  for (let i = 0; i < chapters.length; i++) {
+    if (chapters[i]!.charStart <= charOffset) index = i;
+    else break;
+  }
+  if (index === -1) return null;
+  return {
+    number: index + 1,
+    title: chapters[index]!.title,
+    charStart: chapters[index]!.charStart,
+    nextCharStart: chapters[index + 1]?.charStart ?? totalChars,
+  };
+}
+
 export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps) {
   const { repository, ready } = useLibrary();
   const { settings: chapterDetection } = useChapterDetection();
@@ -66,7 +93,6 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
 
   const [playbackState, setPlaybackState] = useState<PlaybackState>('idle');
   const [progress, setProgress] = useState(0);
-  const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [rate, setRate] = useState(1);
   const [voiceURI, setVoiceURI] = useState<string | null>(null);
   const [voices, setVoices] = useState<VoiceInfo[]>([]);
@@ -80,6 +106,14 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const [currentCharOffset, setCurrentCharOffset] = useState(0);
   const [currentParagraphIndex, setCurrentParagraphIndex] = useState(0);
+  // The paragraph nearest the top of the viewport, reported by WordText as
+  // the user scrolls — null until the first IntersectionObserver callback
+  // fires. Used (only while not playing) so the header/pill show what's
+  // actually on screen instead of a frozen playback position.
+  const [visibleParagraphIndex, setVisibleParagraphIndex] = useState<number | null>(null);
+  const handleVisibleParagraphChange = useCallback((paragraphIndex: number) => {
+    setVisibleParagraphIndex(paragraphIndex);
+  }, []);
   const [pillMenuOpen, setPillMenuOpen] = useState(false);
   // Reading-session only, not persisted (brief: resets on document switch) —
   // either a fixed duration from the moment it's set, or "pause once the
@@ -134,28 +168,36 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
     [loaded, chapterDetection],
   );
 
-  // The chapter containing the current cursor position, plus where it ends
-  // (the next chapter's start, or end-of-document for the last one) — the
-  // pill player's "Ch. {n} · {title}" line, its chapter-scoped progress
-  // ring/remaining-time, and the "end of chapter" sleep timer all derive
-  // from this. null when detectChapters found nothing (pill falls back to a
-  // paragraph count instead).
-  const currentChapter = useMemo(() => {
-    if (chapters.length === 0) return null;
-    let index = -1;
-    for (let i = 0; i < chapters.length; i++) {
-      if (chapters[i]!.charStart <= currentCharOffset) index = i;
-      else break;
-    }
-    if (index === -1) return null;
-    const totalChars = loaded?.doc.structure.pages.at(-1)?.charEnd ?? 0;
-    return {
-      number: index + 1,
-      title: chapters[index]!.title,
-      charStart: chapters[index]!.charStart,
-      nextCharStart: chapters[index + 1]?.charStart ?? totalChars,
-    };
-  }, [chapters, currentCharOffset, loaded]);
+  const totalChars = loaded?.doc.structure.pages.at(-1)?.charEnd ?? 0;
+
+  // The chapter containing the *playback* cursor — stays tied to real
+  // reading progress regardless of where the user has scrolled to, since
+  // the ring progress and the "end of chapter" sleep timer are both
+  // meaningless outside of what's actually playing. null when
+  // detectChapters found nothing (pill falls back to a paragraph count).
+  const currentChapter = useMemo(
+    () => findChapterAt(chapters, currentCharOffset, totalChars),
+    [chapters, currentCharOffset, totalChars],
+  );
+
+  // What the header/pill *text* should show: the playback chapter while
+  // actually playing, or the chapter containing whatever paragraph is
+  // currently at the top of the viewport otherwise (paused, idle, or the
+  // user scrolled away mid-playback preview) — see WordText's
+  // onVisibleParagraphChange and the bug it fixes (header/pill frozen on a
+  // stale persisted-cursor position while the page visibly shows chapter
+  // 1). Falls back to currentChapter whenever there's no visible-paragraph
+  // reading yet (e.g. the very first render, before the observer's first
+  // callback).
+  const isPlaying = playbackState === 'playing';
+  const visibleCharOffset =
+    visibleParagraphIndex !== null ? (loaded?.doc.structure.paragraphs[visibleParagraphIndex]?.charStart ?? null) : null;
+  const displayCharOffset = isPlaying || visibleCharOffset === null ? currentCharOffset : visibleCharOffset;
+  const displayChapter = useMemo(
+    () => findChapterAt(chapters, displayCharOffset, totalChars),
+    [chapters, displayCharOffset, totalChars],
+  );
+  const displayPageIndex = loaded ? findPageIndexAtOffset(loaded.doc.structure.pages, displayCharOffset) : 0;
 
   const handleSetSleepTimer = useCallback(
     (choice: SleepTimerChoice) => {
@@ -326,7 +368,6 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
       onCursorChange: (cursor) => {
         wordTextRef.current?.setActiveWord(cursor.wordIndex);
         wordTextRef.current?.setActiveSentence(cursor.sentenceIndex);
-        setCurrentPageIndex(cursor.pageIndex);
         setCurrentCharOffset(cursor.charOffset);
         setCurrentParagraphIndex(cursor.paragraphIndex);
         setProgress(controller.getProgress());
@@ -343,7 +384,6 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
     controllerRef.current = controller;
     if (autoplay) controller.play();
     setPlaybackState(controller.getState());
-    setCurrentPageIndex(controller.getCursor().pageIndex);
     setCurrentCharOffset(controller.getCursor().charOffset);
     setCurrentParagraphIndex(controller.getCursor().paragraphIndex);
     setProgress(controller.getProgress());
@@ -491,6 +531,7 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
   useEffect(() => {
     setSearchOpen(false);
     setSearchQuery('');
+    setVisibleParagraphIndex(null);
   }, [documentId]);
 
   useReaderShortcuts({
@@ -529,23 +570,26 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
 
   const { doc, text } = loaded;
   const totalPages = doc.structure.pages.length;
-  const currentPage = totalPages > 1 ? currentPageIndex + 1 : null;
-  const totalChars = doc.structure.pages.at(-1)?.charEnd ?? 0;
+  const displayPage = totalPages > 1 ? displayPageIndex + 1 : null;
   const totalParagraphs = doc.structure.paragraphs.length;
+  // The ring stays tied to the real playback chapter — it's only ever
+  // rendered while playing (see PlaybackPill's PlayButton), by which point
+  // displayChapter === currentChapter anyway, so this never needs to switch
+  // basis.
   const pillProgress = currentChapter
     ? Math.min(
         1,
         Math.max(0, (currentCharOffset - currentChapter.charStart) / (currentChapter.nextCharStart - currentChapter.charStart || 1)),
       )
     : progress;
-  const remainingInChapterSeconds = currentChapter
-    ? (currentChapter.nextCharStart - currentCharOffset) / (ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 * rate)
+  const remainingInChapterSeconds = displayChapter
+    ? (displayChapter.nextCharStart - displayCharOffset) / (ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 * rate)
     : null;
 
   return (
     <ReaderHeader
       title={doc.title}
-      chapterSubtitle={currentChapter ? `Chapter ${currentChapter.number} · ${currentChapter.title}` : undefined}
+      chapterSubtitle={displayChapter ? `Chapter ${displayChapter.number} · ${displayChapter.title}` : undefined}
       onBack={onBack}
       onRename={() => setRenaming(true)}
       onDelete={() => setDeleting(true)}
@@ -599,6 +643,7 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
                   paragraphs={doc.structure.paragraphs}
                   initialHighlightWordIndex={loaded.cursor.wordIndex}
                   onWordClick={handleWordClick}
+                  onVisibleParagraphChange={handleVisibleParagraphChange}
                 />
               </div>
               <div className="pill-dock">
@@ -606,11 +651,11 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
                   state={playbackState}
                   progress={pillProgress}
                   rate={rate}
-                  chapterNumber={currentChapter?.number ?? null}
-                  chapterTitle={currentChapter?.title ?? null}
-                  paragraphNumber={currentParagraphIndex + 1}
+                  chapterNumber={displayChapter?.number ?? null}
+                  chapterTitle={displayChapter?.title ?? null}
+                  paragraphNumber={(isPlaying || visibleParagraphIndex === null ? currentParagraphIndex : visibleParagraphIndex) + 1}
                   totalParagraphs={totalParagraphs}
-                  currentPage={currentPage}
+                  currentPage={displayPage}
                   totalPages={totalPages}
                   remainingInChapterSeconds={remainingInChapterSeconds}
                   menuOpen={pillMenuOpen}
