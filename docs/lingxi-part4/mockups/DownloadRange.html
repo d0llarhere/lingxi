@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Download for offline: chapters</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+p{margin:0 0 26px}
+.cap{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8f9699}
+.seg{display:flex;gap:3px;background:#1a1c1d;border-radius:10px;padding:3px}
+.sb{flex:1;height:36px;border:0;border-radius:8px;background:transparent;color:#b5bbbe;font:600 13px Manrope,sans-serif;cursor:pointer}
+.on{background:#33383a;color:#fff}
+.fld{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+.fl{font-size:12px;font-weight:600;color:#a9afb2}
+.sel{height:44px;border:1px solid #3a3f41;border-radius:10px;background:#1a1c1d;color:#e4e6e7;font:600 14px Manrope,sans-serif;padding:0 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left}
+.chip{height:32px;border:1px solid #3a3f41;border-radius:999px;background:transparent;color:#d3d7d9;font:600 12px Manrope,sans-serif;padding:0 12px;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; position: relative; overflow: hidden; background: #1b1d1e; color: #e4e6e7; font-family: Manrope, sans-serif;">
+  <header style="height: 64px; border-bottom: 1px solid #2a2e2f; display: flex; align-items: center; padding: 0 28px; font-size: 15px; font-weight: 600;">Library of Heaven's Path 1-100</header>
+  <main style="width: 640px; margin: 0 auto; padding-top: 48px; font-family: Literata, Georgia, serif; font-size: 20px; line-height: 1.8; color: #d6d8d6;">
+    <p>The rain had not stopped for three days, and the lantern over the archive door swung on its chain like a slow clock.</p>
+    <p>Wen Lu climbed the last step, shook the water from his sleeves, and counted the keys on his ring twice.</p>
+    <p>Inside, the shelves smelled of cedar and lamp oil.</p>
+  </main>
+  <div style="position: absolute; inset: 0; background: rgba(8,10,11,.62);"></div>
+
+  <div role="dialog" aria-modal="true" aria-labelledby="dlt" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 520px; background: #222627; border: 1px solid #383d3f; border-radius: 20px; box-shadow: 0 30px 60px rgba(0,0,0,.6); padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px;">
+    <div style="display: flex; align-items: flex-start; gap: 12px;">
+      <div style="flex: 1;">
+        <h2 id="dlt" style="margin: 0; font-size: 20px;">Download for offline</h2>
+        <div style="font-size: 13px; color: #9aa0a3; margin-top: 4px;">Library of Heaven's Path 1-100</div>
+      </div>
+      <button aria-label="Close" style="width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: #a9afb2; display: flex; align-items: center; justify-content: center; cursor: pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+
+    <div class="seg" role="radiogroup" aria-label="What to download">
+      <button class="sb" role="radio" aria-checked="false">Whole book</button>
+      <button class="sb on" role="radio" aria-checked="true">Chapters</button>
+      <button class="sb" role="radio" aria-checked="false">Pages</button>
+    </div>
+
+    <div style="display: flex; align-items: flex-end; gap: 10px;">
+      <label class="fld"><span class="fl">From</span><button class="sel"><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Ch. 6 <span style="color: #9aa0a3; font-weight: 500;">· [title]</span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></label>
+      <span style="height: 44px; display: flex; align-items: center; color: #8f9699;">→</span>
+      <label class="fld"><span class="fl">To</span><button class="sel"><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Ch. 15 <span style="color: #9aa0a3; font-weight: 500;">· [title]</span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></label>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+      <button class="chip">This chapter</button>
+      <button class="chip" style="background: #263b33; border-color: #3d5c50; color: #cfeee0;">Next 10 chapters</button>
+      <button class="chip">Next 25</button>
+      <button class="chip">Rest of book</button>
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+      <span class="fl" style="font-size: 13px;">Voice</span>
+      <button class="sel" style="height: 38px; width: 220px;"><span style="display: flex; align-items: center; gap: 8px;"><span style="width: 20px; height: 20px; border-radius: 50%; background: #2f4a40; color: #cfeee0; font-size: 11px; display: flex; align-items: center; justify-content: center;">B</span>Bella · on-device</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+
+    <div style="background: #1a1c1d; border: 1px solid #2e3233; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; gap: 3px; height: 8px;" role="img" aria-label="Chapters 1 to 5 already saved, 6 to 15 selected">
+        <span style="flex: 5; background: #3d5c50; border-radius: 4px 0 0 4px;"></span>
+        <span style="flex: 10; background: #7cc4a8;"></span>
+        <span style="flex: 85; background: #2e3233; border-radius: 0 4px 4px 0;"></span>
+      </div>
+      <div style="display: flex; gap: 16px; font-size: 12px; color: #9aa0a3;">
+        <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: #3d5c50;"></span>Already saved · Ch. 1–5</span>
+        <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: #7cc4a8;"></span>New · Ch. 6–15</span>
+      </div>
+      <div style="font-size: 14px; font-weight: 600;">10 chapters · p. [n]–[n] · about [size]</div>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+      <button style="height: 44px; border: 1px solid #3a3f41; border-radius: 10px; background: transparent; color: #e4e6e7; font: 600 14px Manrope, sans-serif; padding: 0 18px; cursor: pointer;">Cancel</button>
+      <button style="height: 44px; border: 0; border-radius: 10px; background: #7cc4a8; color: #11241c; font: 700 14px Manrope, sans-serif; padding: 0 20px; display: flex; align-items: center; gap: 8px; cursor: pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download 10 chapters</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

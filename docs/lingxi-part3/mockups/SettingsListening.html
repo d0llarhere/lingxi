@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings: listening</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#7cc4a8}
+.nav{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border-radius:8px;color:#b5bbbe;text-decoration:none;font-size:14px;font-weight:600}
+.sn{display:block;height:36px;line-height:36px;padding:0 12px;border-radius:8px;color:#a9afb2;text-decoration:none;font-size:14px;font-weight:600}
+.cap{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8f9699}
+.card{border:1px solid #2e3233;border-radius:14px;background:#202324;overflow:hidden}
+.r{display:flex;align-items:center;gap:16px;padding:10px 18px;border-top:1px solid #2e3233;min-height:52px;box-sizing:border-box}
+.l{flex:1;font-size:14px;font-weight:600}
+.h{display:block;font-size:12px;font-weight:500;color:#9aa0a3;margin-top:2px}
+.seg{display:flex;gap:3px;background:#1a1c1d;border-radius:9px;padding:3px}
+.sb{height:30px;border:0;border-radius:7px;background:transparent;color:#b5bbbe;font:600 12px Manrope,sans-serif;padding:0 11px;cursor:pointer}
+.on{background:#33383a;color:#fff}
+.sw{width:40px;height:22px;border-radius:999px;position:relative;flex-shrink:0;border:0;padding:0;cursor:pointer}
+.sw span{position:absolute;top:3px;width:16px;height:16px;border-radius:50%}
+.btn{height:34px;border:1px solid #3a3f41;border-radius:8px;background:transparent;color:#e4e6e7;font:600 12px Manrope,sans-serif;padding:0 12px;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; overflow: hidden; background: #1b1d1e; color: #e4e6e7; font-family: Manrope, sans-serif; display: flex;">
+  <nav aria-label="Main" style="width: 240px; flex-shrink: 0; background: #181a1b; border-right: 1px solid #2a2e2f; padding: 20px 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px;">
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 19px; font-weight: 700; padding: 0 12px 20px;"><span style="color: #7cc4a8;">灵</span>Lingxi</div>
+    <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 19V5a2 2 0 012-2h12v18H6a2 2 0 01-2-2zM8 7h6"/></svg>Library</a>
+    <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Downloads</a>
+    <div style="flex: 1;"></div>
+    <a class="nav" href="#" style="background: #263b33; color: #cfeee0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 000 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>Settings</a>
+  </nav>
+  <div style="flex: 1; min-width: 0; display: flex; gap: 40px; padding: 36px 48px; box-sizing: border-box;">
+    <nav aria-label="Settings sections" style="width: 180px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px;">
+      <div style="font-size: 22px; font-weight: 700; padding: 0 12px 18px;">Settings</div>
+      <a class="sn" href="#">Reading</a>
+      <a class="sn" href="#" style="background: #25292a; color: #fff;">Listening</a>
+      <a class="sn" href="#">Chapters</a>
+      <a class="sn" href="#">Storage</a>
+      <a class="sn" href="#">Appearance</a>
+      <a class="sn" href="#">About</a>
+    </nav>
+    <main style="flex: 1; max-width: 680px; display: flex; flex-direction: column; gap: 16px;">
+      <div>
+        <h1 style="margin: 0; font-size: 26px;">Listening</h1>
+        <p style="margin: 8px 0 0; font-size: 14px; color: #a9afb2;">Defaults for new books. You can still change voice and speed from the player.</p>
+      </div>
+
+      <span class="cap">Voice</span>
+      <div class="card">
+        <div class="r" style="border-top: 0;"><span class="l">Default voice</span>
+          <button class="btn" aria-label="Preview Bella" style="width: 34px; padding: 0; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>
+          <button class="btn" style="display: flex; align-items: center; gap: 8px; min-width: 190px; justify-content: space-between;"><span style="display: flex; align-items: center; gap: 8px;"><span style="width: 20px; height: 20px; border-radius: 50%; background: #2f4a40; color: #cfeee0; font-size: 11px; display: flex; align-items: center; justify-content: center;">B</span>Bella · on-device</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+        <div class="r"><span class="l">On-device voices (Kokoro)<span class="h" style="color: #a3dcc5;">Installed · works offline</span></span><button class="btn" style="border-color: #5a3434; color: #f0b4b4;">Remove</button></div>
+        <div class="r"><span class="l">Allow online voices<span class="h">Voices like Aria send text to an online service</span></span><button class="sw" role="switch" aria-checked="true" aria-label="Allow online voices" style="background: #7cc4a8;"><span style="right: 3px; background: #11241c;"></span></button></div>
+      </div>
+
+      <span class="cap">Playback</span>
+      <div class="card">
+        <div class="r" style="border-top: 0;"><span class="l">Default speed</span><div class="seg"><button class="sb">0.75×</button><button class="sb">1×</button><button class="sb on">1.25×</button><button class="sb">1.5×</button><button class="sb">1.75×</button><button class="sb">2×</button></div></div>
+        <div class="r"><span class="l">Skip buttons jump by</span><div class="seg"><button class="sb">Sentence</button><button class="sb on">Paragraph</button><button class="sb">15 s</button></div></div>
+        <div class="r"><span class="l">Pause between paragraphs</span><div class="seg"><button class="sb">None</button><button class="sb on">Short</button><button class="sb">Long</button></div></div>
+        <div class="r"><span class="l">Skip page numbers and headers<span class="h">Don't read "Page 12" or repeated running headers aloud</span></span><button class="sw" role="switch" aria-checked="true" aria-label="Skip page numbers and headers" style="background: #7cc4a8;"><span style="right: 3px; background: #11241c;"></span></button></div>
+      </div>
+
+      <span class="cap">Sleep timer</span>
+      <div class="card">
+        <div class="r" style="border-top: 0;"><span class="l">Default length</span><div class="seg"><button class="sb">15</button><button class="sb on">30</button><button class="sb">45</button><button class="sb">60 min</button><button class="sb">End of chapter</button></div></div>
+        <div class="r"><span class="l">Fade out at the end</span><button class="sw" role="switch" aria-checked="false" aria-label="Fade out" style="background: #3a3f41;"><span style="left: 3px; background: #9aa0a3;"></span></button></div>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

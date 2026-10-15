@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings: chapters</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#7cc4a8}a:hover{color:#a3dcc5}
+.nav{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border-radius:8px;color:#b5bbbe;text-decoration:none;font-size:14px;font-weight:600}
+.sn{display:block;height:36px;line-height:36px;padding:0 12px;border-radius:8px;color:#a9afb2;text-decoration:none;font-size:14px;font-weight:600}
+.bar{height:4px;border-radius:2px;background:#33383a;overflow:hidden}
+.opt{display:flex;align-items:center;gap:14px;padding:16px 18px;cursor:pointer}
+.radio{width:18px;height:18px;border-radius:50%;border:2px solid #5a6164;box-sizing:border-box;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.ot{font-size:15px;font-weight:700}
+.od{font-size:13px;color:#a9afb2;margin-top:3px}
+.ex{font-family:'JetBrains Mono',monospace;font-size:12px;color:#c9cdcf;background:#1a1c1d;border:1px solid #33383a;border-radius:6px;padding:4px 8px;white-space:nowrap}
+.cap{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8f9699}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; overflow: hidden; background: #1b1d1e; color: #e4e6e7; font-family: Manrope, sans-serif; display: flex;">
+  <nav aria-label="Main" style="width: 240px; flex-shrink: 0; background: #181a1b; border-right: 1px solid #2a2e2f; padding: 20px 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px;">
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 19px; font-weight: 700; padding: 0 12px 20px;"><span style="color: #7cc4a8;">灵</span>Lingxi</div>
+    <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 19V5a2 2 0 012-2h12v18H6a2 2 0 01-2-2zM8 7h6"/></svg>Library</a>
+    <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 14v-2a8 8 0 0116 0v2"/><rect x="3" y="14" width="5" height="6" rx="1.5"/><rect x="16" y="14" width="5" height="6" rx="1.5"/></svg>Listening</a>
+    <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Downloads</a>
+    <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 4h14v16l-7-4-7 4z"/></svg>Bookmarks</a>
+    <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM5 11a7 7 0 0014 0M12 18v3"/></svg>Voices</a>
+    <div style="flex: 1;"></div>
+    <div style="padding: 12px; border-radius: 10px; background: #202324; display: flex; flex-direction: column; gap: 8px;">
+      <div style="font-size: 12px; color: #9aa0a3;">Offline storage</div>
+      <div class="bar"><div style="width: 4%; height: 100%; background: #7cc4a8;"></div></div>
+      <div style="font-size: 12px; color: #c9cdcf;">383 MB of 10 GB</div>
+    </div>
+    <a class="nav" href="#" style="background: #263b33; color: #cfeee0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 000 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>Settings</a>
+  </nav>
+
+  <div style="flex: 1; min-width: 0; display: flex; gap: 40px; padding: 36px 48px; box-sizing: border-box;">
+    <nav aria-label="Settings sections" style="width: 180px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px;">
+      <div style="font-size: 22px; font-weight: 700; padding: 0 12px 18px;">Settings</div>
+      <a class="sn" href="#">Reading</a>
+      <a class="sn" href="#">Listening</a>
+      <a class="sn" href="#" style="background: #25292a; color: #fff;">Chapters</a>
+      <a class="sn" href="#">Storage</a>
+      <a class="sn" href="#">Appearance</a>
+      <a class="sn" href="#">About</a>
+    </nav>
+
+    <main style="flex: 1; max-width: 680px; display: flex; flex-direction: column; gap: 26px;">
+      <div>
+        <h1 style="margin: 0; font-size: 26px;">Chapters</h1>
+        <p style="margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: #a9afb2;">How the reader, player and library figure out which chapter you're on. Applies to every book.</p>
+      </div>
+
+      <section style="display: flex; flex-direction: column; gap: 10px;">
+        <span class="cap">How chapters are found</span>
+        <div role="radiogroup" aria-label="Chapter detection" style="border: 1px solid #2e3233; border-radius: 14px; background: #202324; overflow: hidden;">
+          <div class="opt" role="radio" aria-checked="true" style="background: #22302b; box-shadow: inset 3px 0 0 #7cc4a8;">
+            <span class="radio" style="border-color: #7cc4a8;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #7cc4a8;"></span></span>
+            <div style="flex: 1;"><div class="ot">Automatic</div><div class="od">Finds headings that start with "Chapter" or "Part" and a number.</div></div>
+            <span class="ex">Chapter 5</span>
+          </div>
+          <div style="height: 1px; background: #2e3233;"></div>
+          <div class="opt" role="radio" aria-checked="false">
+            <span class="radio"></span>
+            <div style="flex: 1;"><div class="ot">Custom format</div><div class="od">Describe what a heading looks like in your books.</div></div>
+            <span class="ex">1 Swindler</span>
+          </div>
+          <div style="height: 1px; background: #2e3233;"></div>
+          <div class="opt" role="radio" aria-checked="false">
+            <span class="radio"></span>
+            <div style="flex: 1;"><div class="ot">Off</div><div class="od">Show page and paragraph progress only.</div></div>
+            <span class="ex">p. 12 / 665</span>
+          </div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span class="cap">Test on a book</span>
+          <label style="display: flex; align-items: center; gap: 8px; height: 34px; border: 1px solid #33383a; border-radius: 8px; padding: 0 10px; font-size: 13px; color: #e4e6e7;">
+            <span class="sr" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Book to test</span>
+            <select style="border: 0; background: transparent; color: #e4e6e7; font: 600 13px Manrope, sans-serif; outline: none;"><option>Library of Heaven's Path 1-100</option><option>Pagination test</option></select>
+          </label>
+        </div>
+        <div style="border: 1px solid #4a3f2c; background: #262219; border-radius: 14px; padding: 18px; display: flex; gap: 14px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e8c98a" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0; margin-top: 2px;"><path d="M12 3l10 18H2zM12 10v5M12 18v.01"/></svg>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-size: 15px; font-weight: 700; color: #f1e2c2;">No chapters found</div>
+            <div style="font-size: 13px; color: #d9cba9; line-height: 1.55;">This book's headings are a number followed by a title, so automatic detection misses them.</div>
+            <div style="font-family: Literata, serif; font-size: 15px; background: #1b1d1e; border: 1px solid #3a3424; border-radius: 8px; padding: 10px 14px; color: #d6d8d6;"><mark style="background: rgba(232,201,138,.25); color: #fff; border-radius: 3px; padding: 0 3px;">1 Swindler</mark><span style="color: #8f9699;"> · first line of the chapter…</span></div>
+            <div><button style="height: 36px; border: 0; border-radius: 8px; background: #e8c98a; color: #2a2316; font: 700 13px Manrope, sans-serif; padding: 0 14px; cursor: pointer;">Use "number + title" format</button></div>
+          </div>
+        </div>
+      </section>
+
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #8f9699;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7cc4a8" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>Changes save automatically
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
