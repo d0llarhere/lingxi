@@ -256,3 +256,98 @@
   left: 21px;
   background: var(--on-accent);
 }
+
+/* ---------- Theme cards / accent swatches (Appearance settings) ---------- */
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.th {
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: transparent;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  cursor: pointer;
+  font: 600 13px var(--font-ui);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.th-on {
+  border-color: var(--accent);
+}
+
+.th-pv {
+  height: 84px;
+  border-radius: 7px;
+  display: flex;
+  overflow: hidden;
+}
+
+.th-pv-half {
+  flex: 1;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.th-pv-solid {
+  flex-direction: column;
+  gap: 5px;
+  padding: var(--space-2);
+  box-sizing: border-box;
+}
+
+.th-pv-line {
+  height: 5px;
+  border-radius: 3px;
+}
+
+.th-pv-pill {
+  margin-top: auto;
+  height: 14px;
+  width: 50%;
+  border-radius: var(--radius-full);
+}
+
+.th-label {
+  padding: 0 4px 2px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--accent);
+}
+
+.th:not(.th-on) .th-label {
+  color: var(--text-primary);
+}
+
+.accent-swatch-row {
+  display: flex;
+  gap: var(--space-3);
+  flex: 1;
+}
+
+.sw {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sw-on {
+  box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--accent);
+}

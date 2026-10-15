@@ -127,8 +127,61 @@
   --highlight-word: rgba(124, 196, 168, 0.34);
 }
 
+/* Sepia — Appearance settings' fourth theme choice. Its own token set per
+   the brief (paper/ink/accent), not a variant of light/dark — derived once
+   here as a full set (surface/divider/muted-text/shadow tiers), same
+   structure as the dark block above, scaled from the three named anchors:
+   paper #f1e7d0, ink #3b2f1e, accent #8a6a3b. --accent/--accent-hover/
+   --accent-soft/--on-accent/--accent-contrast here are just sensible
+   static defaults — useAccentColor.ts overrides them at runtime (sepia's
+   accent is intrinsic to the theme, not swatch-selectable; see that file). */
+:root[data-theme='sepia'] {
+  color-scheme: light;
+
+  --background: #f1e7d0;
+  --surface: #f8f1e2;
+  --surface-elevated: #faf4e8;
+  --surface-sunken: #e8dcc0;
+  --text-primary: #3b2f1e;
+  --text-secondary: #6b5c42;
+  --text-tertiary: #8a7a5c;
+  --border: #d9cba8;
+  --border-strong: #c7b78e;
+  --accent: #8a6a3b;
+  --accent-hover: #6e5430;
+  --accent-soft: #e8dcc0;
+  --accent-contrast: #ffffff;
+  --highlight: #e8c572;
+  --highlight-text: #3b2f1e;
+  --danger: #a8433a;
+  --danger-hover: #8c362e;
+  --danger-soft: #f0d9d4;
+  --focus-ring: 0 0 0 3px rgba(138, 106, 59, 0.35);
+
+  --shadow-sm: 0 1px 2px rgba(59, 47, 30, 0.08);
+  --shadow-md: 0 6px 16px rgba(59, 47, 30, 0.1);
+  --shadow-lg: 0 16px 40px rgba(59, 47, 30, 0.16);
+
+  --bg: #ece0c4;
+  --bg-sunken: #e2d4b0;
+  --surface-2: #e8dcc0;
+  --divider: #d9cba8;
+  --text: #3b2f1e;
+  --text-muted: #6b5c42;
+  --on-accent: #ffffff;
+  --warn: #9a7a2e;
+  --highlight-sentence: rgba(138, 106, 59, 0.1);
+  --highlight-word: rgba(138, 106, 59, 0.3);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  /* Must also exclude sepia, not just light — same specificity as the
+     :root[data-theme='sepia'] block above, declared later, so without this
+     it would silently win whenever the OS itself prefers dark (live-found:
+     selecting Sepia while the OS is in dark mode left --background etc.
+     resolved to the dark block's values, even though data-theme='sepia' was
+     correctly set and --accent correctly resolved via the inline style). */
+  :root:not([data-theme='light']):not([data-theme='sepia']) {
     color-scheme: dark;
 
     --background: #16181a;

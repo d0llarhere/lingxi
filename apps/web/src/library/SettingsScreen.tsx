@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ListIcon } from '../components/icons';
+import { AppearanceSection } from './AppearanceSection';
 import { ChaptersSection } from './ChaptersSection';
 import { ListeningSection } from './ListeningSection';
 import { ReadingSection } from './ReadingSection';
@@ -8,13 +9,14 @@ import { StorageSection } from './StorageSection';
 
 // Nav order per docs/lingxi-part3/BRIEF_SETTINGS_PAGES.md: Reading ·
 // Listening · Chapters · Storage · Appearance · About.
-export type SettingsSection = 'reading' | 'listening' | 'chapters' | 'storage';
+export type SettingsSection = 'reading' | 'listening' | 'chapters' | 'storage' | 'appearance';
 
 const NAV_ITEMS: { key: SettingsSection; label: string }[] = [
   { key: 'reading', label: 'Reading' },
   { key: 'listening', label: 'Listening' },
   { key: 'chapters', label: 'Chapters' },
   { key: 'storage', label: 'Storage' },
+  { key: 'appearance', label: 'Appearance' },
 ];
 
 interface SettingsScreenProps {
@@ -44,9 +46,9 @@ export function SettingsScreen({ onNavigate, initialSection }: SettingsScreenPro
         <div className="settings-layout">
           <nav aria-label="Settings sections" className="settings-nav">
             <div className="settings-nav-title">Settings</div>
-            {/* Appearance/About land here as their own commits — the brief's
-                own rule is to leave undefined sections out of the nav rather
-                than show an empty page. */}
+            {/* About lands here as its own commit — the brief's own rule is
+                to leave undefined sections out of the nav rather than show
+                an empty page. */}
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.key}
@@ -66,6 +68,8 @@ export function SettingsScreen({ onNavigate, initialSection }: SettingsScreenPro
               <ListeningSection />
             ) : section === 'storage' ? (
               <StorageSection onOpenLibrary={() => onNavigate('library')} />
+            ) : section === 'appearance' ? (
+              <AppearanceSection />
             ) : (
               <ChaptersSection />
             )}

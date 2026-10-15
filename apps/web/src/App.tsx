@@ -5,6 +5,8 @@ import { LibraryScreen } from './library/LibraryScreen';
 import { SettingsScreen, type SettingsSection } from './library/SettingsScreen';
 import type { NavKey } from './library/Sidebar';
 import { ReaderScreen } from './reader/ReaderScreen';
+import { useAccentColor } from './theme/useAccentColor';
+import { useReduceMotion } from './theme/useReduceMotion';
 
 type View =
   | { type: 'nav'; nav: NavKey; settingsSection?: SettingsSection }
@@ -12,6 +14,12 @@ type View =
 
 export function App() {
   const [view, setView] = useState<View>({ type: 'nav', nav: 'library' });
+  // Mounted once, app-wide, purely for their CSS-custom-property side
+  // effects (see each hook's own doc comment) — not every screen renders a
+  // ThemeToggle/Appearance page, so this is the one place guaranteed to run
+  // regardless of route.
+  useAccentColor();
+  useReduceMotion();
 
   if (view.type === 'reader') {
     return (
