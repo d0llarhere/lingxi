@@ -1200,3 +1200,40 @@
   accent-color: var(--danger);
   flex-shrink: 0;
 }
+
+/* ---------- Settings → Reading ---------- */
+
+.reading-preview {
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  background: var(--bg);
+  padding: 22px 28px;
+}
+
+.reading-preview-column {
+  margin-top: 10px;
+}
+
+.reading-preview-column .reading-paragraph {
+  margin: 0;
+}
+
+.field-slider-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 280px;
+  flex-shrink: 0;
+}
+
+.field-slider-row input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.field-slider-value {
+  width: 42px;
+  text-align: right;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}

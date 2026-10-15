@@ -12,7 +12,18 @@ interface WordTextProps {
   // show what's actually on screen instead of a frozen playback position
   // (see ReaderScreen's displayCharOffset).
   onVisibleParagraphChange?: (paragraphIndex: number) => void;
+  // Reading settings' "Auto-scroll to follow the voice" — when false, the
+  // active word/sentence still highlights but the viewport never moves.
+  autoScrollEnabled: boolean;
 }
+
+// How long a hand scroll (wheel/touch) suppresses auto-scroll-to-follow —
+// brief: "Pauses for a few seconds when you scroll yourself".
+const AUTO_SCROLL_SUPPRESS_MS = 5000;
+// Long enough to cover the scrollIntoView({behavior:'smooth'}) animation
+// this component triggers itself, so that scroll is never mistaken for a
+// user-initiated one by the wheel/touchmove listener below.
+const PROGRAMMATIC_SCROLL_GUARD_MS = 1000;
 
 export interface WordTextHandle {
   setActiveWord: (wordIndex: number | null) => void;
@@ -68,7 +79,7 @@ interface Paragraph {
 // closure per word, which also removes an O(n) allocation on every render.
 export const WordText = memo(
   forwardRef<WordTextHandle, WordTextProps>(function WordText(
-    { text, words, paragraphs: paragraphRefs, initialHighlightWordIndex, onWordClick, onVisibleParagraphChange },
+    { text, words, paragraphs: paragraphRefs, initialHighlightWordIndex, onWordClick, onVisibleParagraphChange, autoScrollEnabled },
     ref,
   ) {
     const wordElsRef = useRef<Map<number, HTMLSpanElement>>(new Map());
@@ -77,6 +88,30 @@ export const WordText = memo(
     const activeSentenceIndexRef = useRef<number | null>(null);
     const activeIndexRef = useRef<number | null>(null);
     const searchMatchIndicesRef = useRef<Set<number>>(new Set());
+    // Read inside the IntersectionObserver callback below, which is created
+    // lazily once and must not close over a stale prop value.
+    const autoScrollEnabledRef = useRef(autoScrollEnabled);
+    useEffect(() => {
+      autoScrollEnabledRef.current = autoScrollEnabled;
+    }, [autoScrollEnabled]);
+    // Timestamp until which auto-scroll is suppressed (brief: "Pauses for a
+    // few seconds when you scroll yourself"), and a guard so the hand-scroll
+    // listener below doesn't mistake our own scrollIntoView call for one.
+    const scrollSuppressedUntilRef = useRef(0);
+    const programmaticScrollRef = useRef(false);
+
+    useEffect(() => {
+      function handleUserScroll() {
+        if (programmaticScrollRef.current) return;
+        scrollSuppressedUntilRef.current = Date.now() + AUTO_SCROLL_SUPPRESS_MS;
+      }
+      window.addEventListener('wheel', handleUserScroll, { passive: true });
+      window.addEventListener('touchmove', handleUserScroll, { passive: true });
+      return () => {
+        window.removeEventListener('wheel', handleUserScroll);
+        window.removeEventListener('touchmove', handleUserScroll);
+      };
+    }, []);
     const activeMatchIndexRef = useRef<number | null>(null);
     // Lazily-created; only needed once playback actually starts scrolling.
     const visibilityObserverRef = useRef<IntersectionObserver | null>(null);
@@ -205,9 +240,14 @@ export const WordText = memo(
             if (!visibilityObserverRef.current) {
               visibilityObserverRef.current = new IntersectionObserver(
                 (entries) => {
+                  if (!autoScrollEnabledRef.current || Date.now() < scrollSuppressedUntilRef.current) return;
                   for (const entry of entries) {
                     if (!entry.isIntersecting) {
+                      programmaticScrollRef.current = true;
                       entry.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      setTimeout(() => {
+                        programmaticScrollRef.current = false;
+                      }, PROGRAMMATIC_SCROLL_GUARD_MS);
                     }
                   }
                 },

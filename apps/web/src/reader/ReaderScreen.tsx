@@ -19,6 +19,7 @@ import { triggerDownload } from '../export/triggerDownload';
 import { useLibrary } from '../library/LibraryProvider';
 import { RenameDialog } from '../library/RenameDialog';
 import { useChapterDetection } from '../settings/useChapterDetection';
+import { useReadingSettings } from '../settings/useReadingSettings';
 import { ariaWakeTracker, EDGE_VOICE_PREFIX } from '../tts/edge/EdgeTTSEngine';
 import { offlineDownloader } from '../tts/offlineDownload';
 import { KOKORO_VOICE_PREFIX } from '../tts/kokoro/KokoroTTSEngine';
@@ -77,6 +78,7 @@ function findChapterAt(chapters: ChapterRef[], charOffset: number, totalChars: n
 export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps) {
   const { repository, ready } = useLibrary();
   const { settings: chapterDetection } = useChapterDetection();
+  const { settings: readingSettings } = useReadingSettings();
   const [loaded, setLoaded] = useState<LoadedDocument | null>(null);
   const controllerRef = useRef<PlaybackController | null>(null);
   // Word highlighting during playback is intentionally NOT React state (see
@@ -635,7 +637,15 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
               {approximateHighlighting && (
                 <p className="approximate-note">Word highlighting is approximate on this browser/voice.</p>
               )}
-              <div className="reading-surface">
+              <div
+                className={`reading-surface${
+                  readingSettings.highlightMode === 'off'
+                    ? ' reading-highlight-off'
+                    : readingSettings.highlightMode === 'sentence'
+                      ? ' reading-highlight-sentence'
+                      : ''
+                }`}
+              >
                 <WordText
                   ref={wordTextRef}
                   text={text}
@@ -644,6 +654,7 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
                   initialHighlightWordIndex={loaded.cursor.wordIndex}
                   onWordClick={handleWordClick}
                   onVisibleParagraphChange={handleVisibleParagraphChange}
+                  autoScrollEnabled={readingSettings.autoScroll}
                 />
               </div>
               <div className="pill-dock">

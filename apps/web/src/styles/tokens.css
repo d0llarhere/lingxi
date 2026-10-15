@@ -65,7 +65,11 @@
 
   /* Typography */
   --font-ui: -apple-system, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
-  --font-reading: Georgia, "Iowan Old Style", "Palatino Linotype", "Charter", serif;
+  /* Stable reference for the Reading settings' "Serif" choice — --font-reading
+     itself is overwritten live by useReadingSettings.ts when the user picks
+     a different font, so "Serif" needs its own name to point back to. */
+  --font-reading-serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Charter", serif;
+  --font-reading: var(--font-reading-serif);
   --font-mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
   --font-size-xs: 0.8125rem;
   --font-size-sm: 0.9375rem;
@@ -77,6 +81,8 @@
   --reading-font-size: 1.25rem;
   --reading-line-height: 1.8;
   --reading-max-width: 40rem;
+  --reading-paragraph-spacing: 1em;
+  --reading-text-align: left;
 
   --transition-fast: 120ms ease;
   --transition-base: 200ms ease;

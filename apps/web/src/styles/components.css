@@ -195,3 +195,64 @@
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
 }
+
+/* ---------- Segmented control / switch (Settings rows) ---------- */
+
+.seg-control {
+  display: flex;
+  gap: 3px;
+  background: var(--bg-sunken);
+  border-radius: 9px;
+  padding: 3px;
+  flex-shrink: 0;
+}
+
+.seg-btn {
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 600 12px var(--font-ui);
+  padding: 0 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.seg-btn-on {
+  background: var(--divider);
+  color: var(--text);
+}
+
+.switch {
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--divider);
+  position: relative;
+  flex-shrink: 0;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.switch-on {
+  background: var(--accent);
+}
+
+.switch-thumb {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: left var(--transition-fast), background var(--transition-fast);
+}
+
+.switch-on .switch-thumb {
+  left: 21px;
+  background: var(--on-accent);
+}

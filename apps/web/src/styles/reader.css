@@ -31,12 +31,13 @@
   font-family: var(--font-reading);
   font-size: var(--reading-font-size);
   line-height: var(--reading-line-height);
+  text-align: var(--reading-text-align);
   color: var(--text-primary);
   white-space: pre-wrap;
 }
 
 .reading-paragraph {
-  margin: 0 0 1em;
+  margin: 0 0 var(--reading-paragraph-spacing);
   /* Lets the browser skip layout/paint/style work entirely for paragraphs
      far outside the viewport, instead of always doing it for the whole
      document. This matters for any *global* style change on a huge document
@@ -98,6 +99,19 @@
 .reading-word.is-active-match {
   background: var(--accent-soft);
   box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* Reading settings' "Highlight while listening" — a class on .reading-surface
+   (see ReaderScreen.tsx) rather than touching WordText.tsx's imperative
+   highlighting logic itself. "Sentence + word" (the default) needs no
+   override; these two modes only ever remove tint, never add any. */
+.reading-highlight-sentence .reading-word.is-active {
+  background: transparent;
+}
+
+.reading-highlight-off .reading-word.is-active,
+.reading-highlight-off .reading-sentence.is-active-sentence {
+  background: transparent;
 }
 
 .reading-empty-notice {
