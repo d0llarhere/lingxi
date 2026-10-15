@@ -40,4 +40,26 @@ describe('detectChapters', () => {
       'Chapter and verse, she could recite every rule of the game by heart, having practiced for years on end.';
     expect(detectChapters(text)).toEqual([]);
   });
+
+  it('mode "off" returns no chapters even when "Chapter N" headers are present', () => {
+    const text = ['Chapter 1', '', 'It was a dark and stormy night.'].join('\n');
+    expect(detectChapters(text, { mode: 'off', customPrefix: '' })).toEqual([]);
+  });
+
+  it('mode "custom" with a prefix matches that word instead of "Chapter"/"Part"', () => {
+    const text = ['Section 1', '', 'First part.', '', 'Section 2', '', 'Second part.'].join('\n');
+    const chapters = detectChapters(text, { mode: 'custom', customPrefix: 'Section' });
+    expect(chapters.map((c) => c.title)).toEqual(['Section 1', 'Section 2']);
+  });
+
+  it('mode "custom" with no prefix matches a bare leading number (e.g. translated web-novel style)', () => {
+    const text = ['301 The Excited Ji Mo', '', 'Some text.', '', '302 Another Title', '', 'More text.'].join('\n');
+    const chapters = detectChapters(text, { mode: 'custom', customPrefix: '' });
+    expect(chapters.map((c) => c.title)).toEqual(['301 The Excited Ji Mo', '302 Another Title']);
+  });
+
+  it('mode "custom" with no prefix does not match ordinary prose that starts with a word, not a number', () => {
+    const text = 'The Excited Ji Mo walked into the room and said nothing at all.';
+    expect(detectChapters(text, { mode: 'custom', customPrefix: '' })).toEqual([]);
+  });
 });

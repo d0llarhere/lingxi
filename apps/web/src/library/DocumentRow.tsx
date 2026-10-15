@@ -6,6 +6,7 @@ import { EDGE_VOICE_PREFIX } from '../tts/edge/EdgeTTSEngine';
 import { KOKORO_VOICE_PREFIX } from '../tts/kokoro/KokoroTTSEngine';
 import { offlineDownloader } from '../tts/offlineDownload';
 import { ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 } from '../reader/formatDuration';
+import { useChapterDetection } from '../settings/useChapterDetection';
 import type { DocumentCardData } from './DocumentCard';
 import { useLibrary } from './LibraryProvider';
 
@@ -59,6 +60,7 @@ function formatLength(totalPages: number, totalChars: number, rate: number): str
 export function DocumentRow({ data, onOpen, onPlay, onRename, onDelete }: DocumentRowProps) {
   const { doc, progress, charOffset, totalPages, totalChars } = data;
   const { repository } = useLibrary();
+  const { settings: chapterDetection } = useChapterDetection();
   const [chapter, setChapter] = useState<{ number: number; title: string } | null>(null);
   const percent = Math.round(progress * 100);
   const color = thumbColor(doc.title);
@@ -69,17 +71,21 @@ export function DocumentRow({ data, onOpen, onPlay, onRename, onDelete }: Docume
   // lingxi-redesign/REDESIGN_BRIEF.md's library list spec).
   useEffect(() => {
     if (progress <= 0 || !repository) return;
+    if (chapterDetection.mode === 'off') {
+      setChapter(null);
+      return;
+    }
     let cancelled = false;
     repository.getDocumentText(doc.id).then((text) => {
       if (cancelled || !text) return;
-      const chapters = detectChapters(text);
+      const chapters = detectChapters(text, chapterDetection);
       const found = findChapterAt(chapters, charOffset);
       if (found) setChapter(found);
     });
     return () => {
       cancelled = true;
     };
-  }, [repository, doc.id, progress, charOffset]);
+  }, [repository, doc.id, progress, charOffset, chapterDetection]);
 
   const sourceLabel = doc.sourceType === 'pdf' ? 'PDF' : 'Text';
   const positionLabel = progress <= 0 ? 'not started' : chapter ? `Chapter ${chapter.number} · ${chapter.title}` : `${percent}% read`;

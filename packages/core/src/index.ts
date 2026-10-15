@@ -19,8 +19,8 @@ export type { PlaybackControllerOptions, PlaybackState } from './playback/playba
 export { buildChunkSequence, DEFAULT_CHUNK_TARGET_CHARS } from './playback/chunking';
 export type { ChunkRef } from './playback/chunking';
 export type { SpeakOptions, TTSEngine, VoiceInfo } from './playback/ttsEngine';
-export { detectChapters } from './segmentation/detectChapters';
-export type { ChapterRef } from './segmentation/detectChapters';
+export { DEFAULT_CHAPTER_DETECTION, detectChapters } from './segmentation/detectChapters';
+export type { ChapterDetectionMode, ChapterDetectionSettings, ChapterRef } from './segmentation/detectChapters';
 export { segmentText } from './segmentation/segmentText';
 export { hashText } from './cache/hash';
 export { DB_NAME, DB_VERSION, openLingxiDB } from './storage/db';

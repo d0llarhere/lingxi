@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { LibraryProvider } from './library/LibraryProvider';
 import { LibraryScreen } from './library/LibraryScreen';
 import { PlaceholderScreen } from './library/PlaceholderScreen';
+import { SettingsScreen } from './library/SettingsScreen';
 import type { NavKey } from './library/Sidebar';
 import { ReaderScreen } from './reader/ReaderScreen';
 
@@ -29,6 +30,8 @@ export function App() {
           onOpenDocument={(documentId, options) => setView({ type: 'reader', documentId, autoplay: options?.autoplay })}
           onNavigate={(nav) => setView({ type: 'nav', nav })}
         />
+      ) : view.nav === 'settings' ? (
+        <SettingsScreen onNavigate={(nav) => setView({ type: 'nav', nav })} />
       ) : (
         <PlaceholderScreen nav={view.nav} onNavigate={(nav) => setView({ type: 'nav', nav })} />
       )}

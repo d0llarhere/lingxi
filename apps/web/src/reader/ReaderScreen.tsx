@@ -17,6 +17,7 @@ import { exportSrt } from '../export/exportSrt';
 import { triggerDownload } from '../export/triggerDownload';
 import { useLibrary } from '../library/LibraryProvider';
 import { RenameDialog } from '../library/RenameDialog';
+import { useChapterDetection } from '../settings/useChapterDetection';
 import { ariaWakeTracker, EDGE_VOICE_PREFIX } from '../tts/edge/EdgeTTSEngine';
 import { offlineDownloader } from '../tts/offlineDownload';
 import { KOKORO_VOICE_PREFIX } from '../tts/kokoro/KokoroTTSEngine';
@@ -48,6 +49,7 @@ interface LoadedDocument {
 
 export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps) {
   const { repository, ready } = useLibrary();
+  const { settings: chapterDetection } = useChapterDetection();
   const [loaded, setLoaded] = useState<LoadedDocument | null>(null);
   const controllerRef = useRef<PlaybackController | null>(null);
   // Word highlighting during playback is intentionally NOT React state (see
@@ -127,7 +129,10 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
   // "current chapter" derivation below — one scan, two consumers. Defined
   // early (ahead of handleSetSleepTimer, which closes over currentChapter)
   // rather than down near tocEntries, which only needs `chapters` itself.
-  const chapters = useMemo<ChapterRef[]>(() => (loaded ? detectChapters(loaded.text) : []), [loaded]);
+  const chapters = useMemo<ChapterRef[]>(
+    () => (loaded ? detectChapters(loaded.text, chapterDetection) : []),
+    [loaded, chapterDetection],
+  );
 
   // The chapter containing the current cursor position, plus where it ends
   // (the next chapter's start, or end-of-document for the last one) — the
