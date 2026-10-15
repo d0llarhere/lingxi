@@ -180,7 +180,7 @@ export function PlaybackMenu({
 
           <div className="pill-menu-divider" />
 
-          {isCacheableVoice && (
+          {isCacheableVoice ? (
             <button type="button" role="menuitem" className="pill-mi" onClick={onDownloadOffline}>
               <span className="pill-mi-icon">
                 <DownloadIcon width={16} height={16} />
@@ -200,6 +200,23 @@ export function PlaybackMenu({
                 </div>
               )}
             </button>
+          ) : (
+            // Only kokoro:/edge: voices can be cached (WebSpeech exposes no
+            // audio stream to capture — see CachingTTSEngine.ts), so with
+            // the default/System voice selected there's genuinely nothing
+            // to download yet. Shown disabled rather than hidden outright —
+            // hiding it entirely left the row looking "missing" whenever no
+            // voice had been explicitly picked, which is the common case on
+            // first opening a book.
+            <div className="pill-mi pill-mi-static" aria-disabled="true">
+              <span className="pill-mi-icon">
+                <DownloadIcon width={16} height={16} />
+              </span>
+              <span className="pill-mi-text">
+                Download for offline
+                <span className="pill-mi-sub">Select an on-device or Aria voice to enable</span>
+              </span>
+            </div>
           )}
 
           {isCacheableVoice && cacheStatus?.fullyCached && (
