@@ -3,7 +3,10 @@ import { useCallback, useEffect, useState } from 'react';
 
 const STORAGE_KEY = 'lingxi-chapter-detection';
 
-function readStored(): ChapterDetectionSettings {
+// Plain (non-hook) read of the same stored preference — used by code
+// outside the React tree (offlineDownload.ts, computing a book audio
+// item's chapter-range label) that can't call the hook below.
+export function readChapterDetectionSettings(): ChapterDetectionSettings {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return DEFAULT_CHAPTER_DETECTION;
   try {
@@ -22,7 +25,7 @@ export function useChapterDetection(): {
   settings: ChapterDetectionSettings;
   setSettings: (settings: ChapterDetectionSettings) => void;
 } {
-  const [settings, setSettingsState] = useState<ChapterDetectionSettings>(() => readStored());
+  const [settings, setSettingsState] = useState<ChapterDetectionSettings>(() => readChapterDetectionSettings());
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));

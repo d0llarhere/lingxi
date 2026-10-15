@@ -1,4 +1,9 @@
-import { buildChunkSequence, type LingxiDocument } from '@lingxi/core';
+import { buildChunkSequence, detectChapters, type LingxiDocument } from '@lingxi/core';
+import { collectCachedSegments } from '../export/collectCachedSegments';
+import { exportAudio } from '../export/exportAudio';
+import { exportSrt } from '../export/exportSrt';
+import { getAudioLibraryRepository } from '../library/audioLibraryInstance';
+import { readChapterDetectionSettings } from '../settings/useChapterDetection';
 import { cachingEngine } from './ttsEngineInstance';
 
 export type OfflineDownloadStatus = 'not-started' | 'downloading' | 'ready' | 'error';
@@ -87,7 +92,57 @@ export class OfflineDownloader {
     }
 
     if (runId !== this.activeRun) return;
+    await this.persistAudioItem(doc, documentText, voiceURI, rate);
+    if (runId !== this.activeRun) return;
     this.setStatus('ready', 1, null);
+  }
+
+  // Once every chunk is cached, the book qualifies for exactly the same
+  // "fully cached" export the reader's pill menu already offers — reused
+  // as-is here to build the Downloads page's 'book' audio item, rather
+  // than re-deriving a concatenated blob a second way. A failure here
+  // (e.g. exportAudio somehow finding a gap) is logged, not surfaced as a
+  // download error — the offline-playback cache itself is still correct
+  // and complete either way; only the Downloads-page listing is affected.
+  private async persistAudioItem(doc: LingxiDocument, documentText: string, voiceURI: string, rate: number): Promise<void> {
+    try {
+      const [audio, srt, records] = await Promise.all([
+        exportAudio(doc, documentText, voiceURI, rate),
+        exportSrt(doc, documentText, voiceURI, rate),
+        collectCachedSegments(doc, documentText, voiceURI, rate),
+      ]);
+      if (!audio || !records) return;
+
+      const chapters = detectChapters(documentText, readChapterDetectionSettings());
+      const chapterLabel = chapters.length > 0 ? `Ch. 1–${chapters.length}` : 'Whole book';
+      const durationMs = records.reduce((sum, record) => sum + record.durationMs, 0);
+      const subtitleText = srt ? await srt.blob.text() : null;
+
+      const repo = await getAudioLibraryRepository();
+      await repo.saveAudioItem({
+        // Deterministic so re-downloading the same book/voice/rate updates
+        // the existing item in place instead of duplicating it.
+        id: `book-${doc.id}-${voiceURI}-${rate}`,
+        kind: 'book',
+        title: doc.title,
+        createdAt: Date.now(),
+        lastPlayedAt: null,
+        sizeBytes: audio.blob.size,
+        durationMs,
+        audioBlob: audio.blob,
+        mimeType: audio.blob.type,
+        positionMs: 0,
+        rate,
+        subtitlesOn: subtitleText !== null,
+        subtitleFilename: subtitleText ? `${doc.title}.srt` : null,
+        subtitleText,
+        documentId: doc.id,
+        voiceURI,
+        chapterLabel,
+      });
+    } catch (error) {
+      console.error('Failed to save downloaded audio item', error);
+    }
   }
 }
 

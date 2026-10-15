@@ -1,8 +1,11 @@
 import type { IDBPDatabase } from 'idb';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { AudioLibraryRepository } from '../src/storage/audioLibrary';
 import type { LingxiDB } from '../src/storage/db';
 import { openLingxiDB } from '../src/storage/db';
 import { LibraryRepository } from '../src/storage/libraryRepository';
+import type { AudioItemRecord } from '../src/storage/records';
+import { SegmentCacheRepository, type SegmentCacheRecord } from '../src/storage/segmentCache';
 
 let dbName: string;
 let db: IDBPDatabase<LingxiDB>;
@@ -161,5 +164,69 @@ describe('LibraryRepository', () => {
 
     const text = await repo.getDocumentText(doc.id);
     expect(text?.length).toBe(longText.length);
+  });
+});
+
+describe('LibraryRepository.deleteDocument cascade', () => {
+  function sampleAudioItem(overrides: Partial<AudioItemRecord> = {}): AudioItemRecord {
+    return {
+      id: crypto.randomUUID(),
+      kind: 'book',
+      title: 'Book audio',
+      createdAt: Date.now(),
+      lastPlayedAt: null,
+      sizeBytes: 100,
+      durationMs: 1000,
+      audioBlob: new Blob([new Uint8Array(4)]),
+      mimeType: 'audio/wav',
+      positionMs: 0,
+      rate: 1,
+      subtitlesOn: false,
+      subtitleFilename: null,
+      subtitleText: null,
+      documentId: null,
+      voiceURI: 'kokoro:af_bella',
+      chapterLabel: 'Whole book',
+      ...overrides,
+    };
+  }
+
+  function sampleSegment(overrides: Partial<SegmentCacheRecord> = {}): SegmentCacheRecord {
+    return {
+      key: crypto.randomUUID(),
+      text: 'Some chunk.',
+      audioBlob: new Blob([new Uint8Array(4)]),
+      words: [],
+      engine: 'kokoro',
+      durationMs: 500,
+      createdAt: Date.now(),
+      ...overrides,
+    };
+  }
+
+  it('deletes every audio item generated from the document, but leaves other documents\' items alone', async () => {
+    const audioRepo = new AudioLibraryRepository(db);
+    const doc = await repo.createFromPastedText('Doc A', 'Some content.');
+    const otherDoc = await repo.createFromPastedText('Doc B', 'Other content.');
+
+    await audioRepo.saveAudioItem(sampleAudioItem({ id: 'a-1', documentId: doc.id }));
+    await audioRepo.saveAudioItem(sampleAudioItem({ id: 'a-2', documentId: doc.id }));
+    await audioRepo.saveAudioItem(sampleAudioItem({ id: 'b-1', documentId: otherDoc.id }));
+    await audioRepo.saveAudioItem(sampleAudioItem({ id: 'imported-1', kind: 'imported', documentId: null }));
+
+    await repo.deleteDocument(doc.id);
+
+    const remaining = await audioRepo.listAudioItems();
+    expect(remaining.map((item) => item.id).sort()).toEqual(['b-1', 'imported-1']);
+  });
+
+  it('does not touch the per-chunk segment cache (content-addressed, no document identity)', async () => {
+    const segmentRepo = new SegmentCacheRepository(db);
+    const doc = await repo.createFromPastedText('Doc C', 'Some content.');
+    await segmentRepo.putSegment(sampleSegment({ key: 'chunk-1' }));
+
+    await repo.deleteDocument(doc.id);
+
+    expect(await segmentRepo.getSegment('chunk-1')).toBeDefined();
   });
 });

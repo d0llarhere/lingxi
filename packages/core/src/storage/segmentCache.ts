@@ -33,4 +33,18 @@ export class SegmentCacheRepository {
   async putSegment(record: SegmentCacheRecord): Promise<void> {
     await this.db.put('segmentCache', record);
   }
+
+  // Settings→Storage's "Cache" row — sums every segment's blob size. Only
+  // called on an occasional Settings-page render, not a hot path, so a
+  // plain getAll() + reduce is fine even for a long book's worth of chunks.
+  async getTotalSize(): Promise<number> {
+    const all = await this.db.getAll('segmentCache');
+    return all.reduce((sum, record) => sum + record.audioBlob.size, 0);
+  }
+
+  // Wipes the whole store — safe without confirmation (per the brief) since
+  // this is purely a regenerable synthesis cache, never user-authored data.
+  async clear(): Promise<void> {
+    await this.db.clear('segmentCache');
+  }
 }

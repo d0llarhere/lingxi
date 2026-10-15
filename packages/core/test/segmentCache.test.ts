@@ -60,6 +60,25 @@ describe('SegmentCacheRepository', () => {
     expect(fetched?.engine).toBe('kokoro');
     expect(fetched?.words).toEqual([]);
   });
+
+  it('sums every entry\'s blob size for getTotalSize', async () => {
+    await repo.putSegment(sampleRecord({ key: 'a', audioBlob: new Blob([new Uint8Array(10)]) }));
+    await repo.putSegment(sampleRecord({ key: 'b', audioBlob: new Blob([new Uint8Array(20)]) }));
+    expect(await repo.getTotalSize()).toBe(30);
+  });
+
+  it('returns 0 from getTotalSize when empty', async () => {
+    expect(await repo.getTotalSize()).toBe(0);
+  });
+
+  it('clear() wipes every entry', async () => {
+    await repo.putSegment(sampleRecord({ key: 'a' }));
+    await repo.putSegment(sampleRecord({ key: 'b' }));
+    await repo.clear();
+    expect(await repo.getSegment('a')).toBeUndefined();
+    expect(await repo.getSegment('b')).toBeUndefined();
+    expect(await repo.getTotalSize()).toBe(0);
+  });
 });
 
 describe('DB migration (v1 -> v2)', () => {

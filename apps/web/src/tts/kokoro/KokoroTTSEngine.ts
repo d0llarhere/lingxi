@@ -150,6 +150,28 @@ export class KokoroTTSEngine implements TTSEngine {
     this.worker.postMessage({ type: 'download' });
   }
 
+  // Settings→Storage's "Voice model → Remove". transformers.js caches the
+  // model via the browser's Cache Storage API under this exact bucket name
+  // (confirmed by reading the installed @huggingface/transformers package —
+  // `caches.open('transformers-cache')`); deleting it plus the local
+  // "ready" flag is the only way to reclaim that space, since there's no
+  // transformers.js API for it. A worker that's already loaded the model
+  // into memory keeps working until the page reloads — this only prevents
+  // it from being considered "ready" (and from being read from cache)
+  // going forward, it doesn't abort anything in-flight.
+  async remove(): Promise<void> {
+    if ('caches' in window) {
+      await caches.delete('transformers-cache').catch(() => {
+        // Best-effort: if Cache Storage isn't available or the delete
+        // fails, the model-ready flag still gets cleared below, which is
+        // the part that actually controls whether the UI offers "Get"
+        // again — worst case here is some bytes aren't reclaimed.
+      });
+    }
+    persistReady(false);
+    this.setStatus('not-downloaded', 0, null);
+  }
+
   private handleWorkerMessage(msg: WorkerMessage): void {
     if (msg.type === 'download-progress') {
       this.setStatus('downloading', msg.progress ?? this.progress, null);

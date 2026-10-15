@@ -110,13 +110,23 @@ export class LibraryRepository {
     await this.db.put('documents', { ...doc, lastOpenedAt: Date.now() });
   }
 
+  // Also deletes every downloaded/imported audio item generated from this
+  // book (via the `documentId` index — see db.ts). The low-level per-chunk
+  // TTS cache (segmentCache) is deliberately NOT touched here: it's
+  // content-addressed with no document back-reference by design (see
+  // segmentCache.ts), so there's no reliable way to know which entries
+  // belong to this document without re-deriving every chunk for every
+  // voice ever used. That cache is reclaimed generically instead, via
+  // Settings→Storage's "Cache → Clear".
   async deleteDocument(id: string): Promise<void> {
-    const tx = this.db.transaction(['documents', 'documentText', 'cursors', 'sourceFiles'], 'readwrite');
+    const tx = this.db.transaction(['documents', 'documentText', 'cursors', 'sourceFiles', 'audioItems'], 'readwrite');
+    const audioItemIds = await tx.objectStore('audioItems').index('documentId').getAllKeys(id);
     await Promise.all([
       tx.objectStore('documents').delete(id),
       tx.objectStore('documentText').delete(id),
       tx.objectStore('cursors').delete(id),
       tx.objectStore('sourceFiles').delete(id),
+      ...audioItemIds.map((audioItemId) => tx.objectStore('audioItems').delete(audioItemId)),
       tx.done,
     ]);
   }
