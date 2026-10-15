@@ -148,6 +148,18 @@
   font-size: var(--font-size-sm);
   color: var(--text-primary);
   cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Rows with a trailing detail label (e.g. Downloads' "Sort by" / "Import
+   audio…") need more breathing room than the plain Rename/Delete rows this
+   menu was first built for. */
+.menu-item:has(.menu-item-detail) {
+  gap: var(--space-2);
+}
+
+.menu-wrapper:has(.menu-item-detail) .menu-panel {
+  min-width: 16rem;
 }
 
 .menu-item:hover {

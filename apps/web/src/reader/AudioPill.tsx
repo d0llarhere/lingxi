@@ -97,11 +97,23 @@ function SeekBar({
 export function AudioPill({ item, onClose, onPersisted }: AudioPillProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const subtitleInputRef = useRef<HTMLInputElement>(null);
-  // Keyed on item.id, not item.audioBlob: DownloadsScreen re-fetches items
-  // from IndexedDB every ~5s while this is playing (onPersisted → refresh),
-  // which deserializes a brand-new Blob object each time even though the
-  // bytes are unchanged — keying on the object reference would tear down
-  // and recreate the object URL (interrupting playback) on every refresh.
+  // Deliberately never revoked. It was originally created+revoked in a
+  // useEffect (paired in the same effect so they couldn't drift), but under
+  // StrictMode's dev-only double-invoke of effects that still raced with the
+  // browser's own async media-resource-selection for this exact <audio>
+  // element: the element could start loading the first pass's URL, have it
+  // revoked by that pass's cleanup, and never recover even once a second,
+  // valid URL was assigned — confirmed live (readyState stuck at 0 forever,
+  // even after an explicit .load()), and confirmed to disappear entirely
+  // with StrictMode turned off. DownloadsScreen only ever mounts one AudioPill
+  // at a time, so the worst case is one leaked blob URL per distinct item
+  // played per page load — a few hundred KB–MB, trivial, and cleared on
+  // reload/navigation away regardless. Keyed on item.id, not item.audioBlob:
+  // DownloadsScreen re-fetches items from IndexedDB every ~5s while this is
+  // playing (onPersisted → refresh), which deserializes a brand-new Blob
+  // object each time even though the bytes are unchanged — keying on the
+  // object reference would tear down and recreate the URL (interrupting
+  // playback) on every refresh.
   const objectUrl = useMemo(() => URL.createObjectURL(item.audioBlob), [item.id]);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -122,8 +134,6 @@ export function AudioPill({ item, onClose, onPersisted }: AudioPillProps) {
     [subtitleText, subtitleFilename],
   );
   const activeCue = subtitlesOn ? cues.find((cue) => currentTimeMs >= cue.startMs && currentTimeMs < cue.endMs) ?? null : null;
-
-  useEffect(() => () => URL.revokeObjectURL(objectUrl), [objectUrl]);
 
   // Resume at the saved position/rate once the file's metadata (and thus a
   // real `duration`) is available.
