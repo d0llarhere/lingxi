@@ -308,6 +308,38 @@ export function CheckIcon(props: IconProps) {
   );
 }
 
+export function MusicNoteIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9 18V5l12-2v13" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="18" cy="16" r="3" />
+    </svg>
+  );
+}
+
+export function SortIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="7" y1="12" x2="17" y2="12" />
+      <line x1="10" y1="18" x2="14" y2="18" />
+    </svg>
+  );
+}
+
+// The "now playing" row indicator — three bars with a staggered CSS
+// animation (see .eq-bar in library.css) instead of thumbnail text/icon.
+export function EqualizerIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect className="eq-bar eq-bar-1" x="5" y="10" width="3" height="8" rx="1" fill="currentColor" stroke="none" />
+      <rect className="eq-bar eq-bar-2" x="10.5" y="6" width="3" height="12" rx="1" fill="currentColor" stroke="none" />
+      <rect className="eq-bar eq-bar-3" x="16" y="9" width="3" height="9" rx="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function AlertTriangleIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

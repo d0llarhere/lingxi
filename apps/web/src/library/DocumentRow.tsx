@@ -28,13 +28,15 @@ const THUMB_PALETTE = [
   { bg: '#4a3a2c', fg: '#ecc4a3' },
 ];
 
-function thumbColor(title: string): { bg: string; fg: string } {
+// Exported for reuse by DownloadRow.tsx — downloaded/imported audio items
+// get the same hash-based cover color and initial glyph as library rows.
+export function thumbColor(title: string): { bg: string; fg: string } {
   let hash = 0;
   for (let i = 0; i < title.length; i++) hash = (hash * 31 + title.charCodeAt(i)) | 0;
   return THUMB_PALETTE[Math.abs(hash) % THUMB_PALETTE.length]!;
 }
 
-function thumbInitial(title: string): string {
+export function thumbInitial(title: string): string {
   const cjk = title.match(/[㐀-鿿぀-ヿ가-힯]/);
   return cjk?.[0] ?? title.trim().charAt(0).toUpperCase() ?? '?';
 }
@@ -138,7 +140,9 @@ export function DocumentRow({ data, onOpen, onPlay, onRename, onDelete }: Docume
   );
 }
 
-function findChapterAt(chapters: ChapterRef[], charOffset: number): { number: number; title: string } | null {
+// Exported for reuse by DownloadRow.tsx, which approximates a book audio
+// item's current chapter from its playback position the same way.
+export function findChapterAt(chapters: ChapterRef[], charOffset: number): { number: number; title: string } | null {
   let index = -1;
   for (let i = 0; i < chapters.length; i++) {
     if (chapters[i]!.charStart <= charOffset) index = i;

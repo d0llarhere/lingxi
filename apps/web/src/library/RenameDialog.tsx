@@ -2,12 +2,13 @@ import { useState, type FormEvent } from 'react';
 import { Modal } from '../components/Modal';
 
 interface RenameDialogProps {
+  heading?: string;
   initialTitle: string;
   onClose: () => void;
   onSubmit: (title: string) => Promise<void>;
 }
 
-export function RenameDialog({ initialTitle, onClose, onSubmit }: RenameDialogProps) {
+export function RenameDialog({ heading = 'Rename document', initialTitle, onClose, onSubmit }: RenameDialogProps) {
   const [title, setTitle] = useState(initialTitle);
   const [submitting, setSubmitting] = useState(false);
 
@@ -24,7 +25,7 @@ export function RenameDialog({ initialTitle, onClose, onSubmit }: RenameDialogPr
   }
 
   return (
-    <Modal title="Rename document" onClose={onClose}>
+    <Modal title={heading} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         <div className="field">
           <label className="field-label" htmlFor="rename-title">

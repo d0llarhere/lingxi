@@ -31,7 +31,10 @@ export class AudioLibraryRepository {
     await this.db.put('audioItems', { ...existing, positionMs, lastPlayedAt: Date.now() });
   }
 
-  async updateAudioItemSettings(id: string, settings: Partial<Pick<AudioItemRecord, 'rate' | 'subtitlesOn'>>): Promise<void> {
+  async updateAudioItemSettings(
+    id: string,
+    settings: Partial<Pick<AudioItemRecord, 'rate' | 'subtitlesOn' | 'title' | 'subtitleFilename' | 'subtitleText'>>,
+  ): Promise<void> {
     const existing = await this.db.get('audioItems', id);
     if (!existing) return;
     await this.db.put('audioItems', { ...existing, ...settings });

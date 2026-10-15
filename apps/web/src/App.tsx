@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { DownloadsScreen } from './library/DownloadsScreen';
 import { LibraryProvider } from './library/LibraryProvider';
 import { LibraryScreen } from './library/LibraryScreen';
-import { PlaceholderScreen } from './library/PlaceholderScreen';
 import { SettingsScreen } from './library/SettingsScreen';
 import type { NavKey } from './library/Sidebar';
 import { ReaderScreen } from './reader/ReaderScreen';
@@ -33,7 +33,7 @@ export function App() {
       ) : view.nav === 'settings' ? (
         <SettingsScreen onNavigate={(nav) => setView({ type: 'nav', nav })} />
       ) : (
-        <PlaceholderScreen nav={view.nav} onNavigate={(nav) => setView({ type: 'nav', nav })} />
+        <DownloadsScreen onNavigate={(nav) => setView({ type: 'nav', nav })} />
       )}
     </LibraryProvider>
   );

@@ -83,6 +83,15 @@ describe('AudioLibraryRepository', () => {
     expect(fetched?.subtitlesOn).toBe(false);
   });
 
+  it('updateAudioItemSettings can also set title and subtitle fields (rename + attach subtitles)', async () => {
+    await repo.saveAudioItem(sampleItem({ id: 'w', title: 'Old title' }));
+    await repo.updateAudioItemSettings('w', { title: 'New title', subtitleFilename: 'book.srt', subtitleText: '1\n00:00:00,000 --> 00:00:01,000\nHi\n' });
+    const fetched = await repo.getAudioItem('w');
+    expect(fetched?.title).toBe('New title');
+    expect(fetched?.subtitleFilename).toBe('book.srt');
+    expect(fetched?.subtitleText).toContain('Hi');
+  });
+
   it('deleteAudioItem removes the item and returns its size', async () => {
     await repo.saveAudioItem(sampleItem({ id: 'z', sizeBytes: 5000 }));
     const freed = await repo.deleteAudioItem('z');

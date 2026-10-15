@@ -162,6 +162,13 @@
   background: var(--danger-soft);
 }
 
+.menu-item-detail {
+  margin-left: auto;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
 /* ---------- Alerts / status text ---------- */
 
 .status-message {

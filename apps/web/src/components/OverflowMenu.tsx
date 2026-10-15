@@ -6,6 +6,9 @@ export interface MenuAction {
   icon?: ReactNode;
   onSelect: () => void;
   danger?: boolean;
+  // Trailing muted text, e.g. a current value ("Last played ›") or a hint
+  // ("mp3, m4a, wav") — see Downloads page's header menu.
+  detail?: string;
 }
 
 export function OverflowMenu({ actions, label }: { actions: MenuAction[]; label: string }) {
@@ -59,6 +62,7 @@ export function OverflowMenu({ actions, label }: { actions: MenuAction[]; label:
             >
               {action.icon}
               {action.label}
+              {action.detail && <span className="menu-item-detail">{action.detail}</span>}
             </button>
           ))}
         </div>
