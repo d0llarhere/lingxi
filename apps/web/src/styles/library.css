@@ -419,7 +419,11 @@
 .doc-table {
   border: 1px solid var(--divider);
   border-radius: 14px;
-  overflow: hidden;
+  /* No overflow: hidden here — it clipped the "more options" dropdown
+     (position: absolute, opens downward) on rows near the bottom of the
+     table instead of just hiding the square corners it was meant for.
+     Rounding the first/last row directly gets the same look without
+     clipping anything that needs to render outside the table's box. */
 }
 
 .doc-row {
@@ -431,8 +435,13 @@
   border-bottom: 1px solid var(--divider);
 }
 
+.doc-row:first-child {
+  border-radius: 14px 14px 0 0;
+}
+
 .doc-row:last-child {
   border-bottom: 0;
+  border-radius: 0 0 14px 14px;
 }
 
 .doc-row-header {
