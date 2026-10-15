@@ -100,24 +100,39 @@ function SeekBar({
 export function AudioPill({ item, onClose, onPersisted }: AudioPillProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const subtitleInputRef = useRef<HTMLInputElement>(null);
-  // Deliberately never revoked. It was originally created+revoked in a
-  // useEffect (paired in the same effect so they couldn't drift), but under
-  // StrictMode's dev-only double-invoke of effects that still raced with the
-  // browser's own async media-resource-selection for this exact <audio>
-  // element: the element could start loading the first pass's URL, have it
-  // revoked by that pass's cleanup, and never recover even once a second,
-  // valid URL was assigned — confirmed live (readyState stuck at 0 forever,
-  // even after an explicit .load()), and confirmed to disappear entirely
-  // with StrictMode turned off. DownloadsScreen only ever mounts one AudioPill
-  // at a time, so the worst case is one leaked blob URL per distinct item
-  // played per page load — a few hundred KB–MB, trivial, and cleared on
-  // reload/navigation away regardless. Keyed on item.id, not item.audioBlob:
-  // DownloadsScreen re-fetches items from IndexedDB every ~5s while this is
-  // playing (onPersisted → refresh), which deserializes a brand-new Blob
-  // object each time even though the bytes are unchanged — keying on the
-  // object reference would tear down and recreate the URL (interrupting
-  // playback) on every refresh.
-  const objectUrl = useMemo(() => URL.createObjectURL(item.audioBlob), [item.id]);
+  // Keyed on item.id, not item.audioBlob: DownloadsScreen re-fetches items
+  // from IndexedDB every ~5s while this is playing (onPersisted → refresh),
+  // which deserializes a brand-new Blob object each time even though the
+  // bytes are unchanged — keying on the object reference would tear down
+  // and recreate the URL (interrupting playback) on every refresh.
+  //
+  // Revocation always targets the *previous* track's URL (held in the ref),
+  // never the one this same effect run just created — so even when
+  // StrictMode double-invokes this effect in dev, the first pass's cleanup
+  // can't revoke a URL that's still (or about to be) the one actually
+  // assigned to the live <audio> element. The only time the *current* URL
+  // gets revoked is a true unmount, via the deferred, self-guarding check in
+  // cleanup below (an earlier version revoked+recreated in one effect and
+  // hit exactly this race under StrictMode — readyState stuck at 0 forever
+  // — which is why it used to just never revoke at all).
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const lastObjectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const url = URL.createObjectURL(item.audioBlob);
+    if (lastObjectUrlRef.current) URL.revokeObjectURL(lastObjectUrlRef.current);
+    lastObjectUrlRef.current = url;
+    setObjectUrl(url);
+
+    return () => {
+      setTimeout(() => {
+        if (lastObjectUrlRef.current === url) {
+          URL.revokeObjectURL(url);
+          lastObjectUrlRef.current = null;
+        }
+      }, 0);
+    };
+  }, [item.id]);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTimeMs, setCurrentTimeMs] = useState(item.positionMs);
@@ -328,7 +343,7 @@ export function AudioPill({ item, onClose, onPersisted }: AudioPillProps) {
       <div className="audio-pill">
         <audio
           ref={audioRef}
-          src={objectUrl}
+          src={objectUrl ?? undefined}
           onLoadedMetadata={handleLoadedMetadata}
           onTimeUpdate={(e) => setCurrentTimeMs(Math.round(e.currentTarget.currentTime * 1000))}
           onPlay={() => setIsPlaying(true)}
