@@ -299,3 +299,19 @@ export function ListIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function CheckIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M5 12l5 5 9-10" />
+    </svg>
+  );
+}
+
+export function AlertTriangleIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3l10 18H2zM12 10v5M12 18v.01" />
+    </svg>
+  );
+}
