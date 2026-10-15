@@ -1,6 +1,7 @@
 import type { DocumentStructure, ReadingCursor, WordRef } from '../model/types';
 import { buildChunkFromWord, DEFAULT_CHUNK_TARGET_CHARS } from './chunking';
 import { computeProgress, findWordAtOrBeforeOffset, findWordIndexAtOrAfterOffset } from './cursorMath';
+import { shouldSkipSentenceForSpeech } from './speechFilter';
 import type { TTSEngine, VoiceInfo } from './ttsEngine';
 
 export type PlaybackState = 'idle' | 'playing' | 'paused';
@@ -31,6 +32,12 @@ export interface PlaybackControllerOptions {
   initialCursor: ReadingCursor;
   initialVoiceURI: string | null;
   initialRate: number;
+  // Listening settings (see useListeningDefaults.ts) — read once at
+  // construction, not reactive to later setting changes within the same
+  // controller instance (the Settings page and the reader are mutually
+  // exclusive routes in this app, so that can't happen mid-session anyway).
+  initialParagraphPauseMs?: number;
+  initialSkipArtifacts?: boolean;
   // Overrides DEFAULT_CHUNK_TARGET_CHARS — exposed so tests can force
   // one-sentence-per-chunk granularity deterministically instead of relying
   // on short test fixtures to stay under the real default.
@@ -77,6 +84,8 @@ export class PlaybackController {
   private state: PlaybackState = 'idle';
   private voiceURI: string | null;
   private rate: number;
+  private readonly paragraphPauseMs: number;
+  private readonly skipArtifacts: boolean;
   private utteranceGeneration = 0;
 
   constructor(opts: PlaybackControllerOptions) {
@@ -87,6 +96,8 @@ export class PlaybackController {
     this.cursor = opts.initialCursor;
     this.voiceURI = opts.initialVoiceURI;
     this.rate = clampRate(opts.initialRate);
+    this.paragraphPauseMs = opts.initialParagraphPauseMs ?? 0;
+    this.skipArtifacts = opts.initialSkipArtifacts ?? false;
     this.ttsEngine = opts.ttsEngine;
     this.persistCursorFn = opts.persistCursor;
     this.persistSettingsFn = opts.persistSettings;
@@ -248,8 +259,23 @@ export class PlaybackController {
     this.cancelPlayback();
   }
 
+  // stopAtParagraphBoundary follows directly from whether a pause is even
+  // configured — see chunking.ts's ChunkWalkOptions doc comment: this is how
+  // "every chunk end is a paragraph end" becomes true whenever a pause is
+  // wanted, with no separate on/off setting of its own.
+  private get chunkWalkOptions() {
+    return { stopAtParagraphBoundary: this.paragraphPauseMs > 0, skipArtifacts: this.skipArtifacts };
+  }
+
   private speakFrom(word: WordRef): void {
-    const chunk = buildChunkFromWord(this.structure, this.documentText, this.wordsBySentence, word, this.chunkTargetChars);
+    const chunk = buildChunkFromWord(
+      this.structure,
+      this.documentText,
+      this.wordsBySentence,
+      word,
+      this.chunkTargetChars,
+      this.chunkWalkOptions,
+    );
     const baseOffset = word.charStart;
 
     // Peek at the next chunk(s) (without moving the cursor there) so engines
@@ -263,7 +289,14 @@ export class PlaybackController {
       if (next === null) break;
       const nextWord = this.structure.words[this.sentenceFirstWordIndex[next] as number];
       if (!nextWord) break;
-      const lookaheadChunk = buildChunkFromWord(this.structure, this.documentText, this.wordsBySentence, nextWord, this.chunkTargetChars);
+      const lookaheadChunk = buildChunkFromWord(
+        this.structure,
+        this.documentText,
+        this.wordsBySentence,
+        nextWord,
+        this.chunkTargetChars,
+        this.chunkWalkOptions,
+      );
       lookaheadTexts.push(lookaheadChunk.text);
       lookaheadSentenceCursor = lookaheadChunk.lastSentenceIndex;
     }
@@ -351,13 +384,34 @@ export class PlaybackController {
 
     this.setCursorFromWord(nextWord);
     this.persistCursorNow();
-    this.speakFrom(nextWord);
+
+    if (this.paragraphPauseMs > 0) {
+      // stopAtParagraphBoundary (see chunkWalkOptions) guarantees every
+      // chunk end reached here is a real paragraph end, so the pause can
+      // apply unconditionally rather than re-checking paragraphIndex.
+      window.setTimeout(() => {
+        if (generation !== this.utteranceGeneration) return; // superseded mid-pause (pause/stop/seek)
+        if (this.state !== 'playing') return;
+        this.speakFrom(nextWord);
+      }, this.paragraphPauseMs);
+    } else {
+      this.speakFrom(nextWord);
+    }
   }
 
+  // Skip-artifact sentences (see speechFilter.ts) are treated as invisible
+  // here too, not just inside chunking.ts's own walk — otherwise this could
+  // land the cursor exactly on a sentence that chunk-building would then
+  // immediately exclude from what's actually spoken (see handleUtteranceEnd,
+  // the caller that matters most: advancing to "the next sentence to
+  // speak").
   private findSentenceWithWords(start: number, step: 1 | -1): number | null {
     let index = start;
     while (index >= 0 && index < this.sentenceFirstWordIndex.length) {
-      if (this.sentenceFirstWordIndex[index] !== -1) return index;
+      if (this.sentenceFirstWordIndex[index] !== -1) {
+        const sentence = this.structure.sentences[index];
+        if (!this.skipArtifacts || !sentence || !shouldSkipSentenceForSpeech(sentence)) return index;
+      }
       index += step;
     }
     return null;

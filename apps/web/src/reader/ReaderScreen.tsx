@@ -19,11 +19,12 @@ import { triggerDownload } from '../export/triggerDownload';
 import { useLibrary } from '../library/LibraryProvider';
 import { RenameDialog } from '../library/RenameDialog';
 import { useChapterDetection } from '../settings/useChapterDetection';
+import { filterVoicesByOnlinePolicy, PARAGRAPH_PAUSE_MS, useListeningDefaults } from '../settings/useListeningDefaults';
 import { useReadingSettings } from '../settings/useReadingSettings';
 import { ariaWakeTracker, EDGE_VOICE_PREFIX } from '../tts/edge/EdgeTTSEngine';
 import { offlineDownloader } from '../tts/offlineDownload';
-import { KOKORO_VOICE_PREFIX } from '../tts/kokoro/KokoroTTSEngine';
-import { edgeEngine, kokoroEngine, ttsEngine, webSpeechEngine } from '../tts/ttsEngineInstance';
+import { previewVoice } from '../tts/previewVoice';
+import { kokoroEngine, ttsEngine } from '../tts/ttsEngineInstance';
 import { ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 } from './formatDuration';
 import { PlaybackPill } from './PlaybackPill';
 import type { SleepTimerChoice } from './PlaybackMenu';
@@ -79,6 +80,7 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
   const { repository, ready } = useLibrary();
   const { settings: chapterDetection } = useChapterDetection();
   const { settings: readingSettings } = useReadingSettings();
+  const { defaults: listeningDefaults } = useListeningDefaults();
   const [loaded, setLoaded] = useState<LoadedDocument | null>(null);
   const controllerRef = useRef<PlaybackController | null>(null);
   // Word highlighting during playback is intentionally NOT React state (see
@@ -154,6 +156,37 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
     setRate(value);
     controllerRef.current?.setSpeed(value);
   }, []);
+
+  // Listening settings' "Skip buttons jump by" — governs both the pill's
+  // prev/next buttons and the ←/→ shortcuts (useReaderShortcuts already
+  // just takes callbacks, no change needed there).
+  const skipSeconds = useCallback(
+    (deltaSeconds: number) => {
+      if (!loaded) return;
+      const controller = controllerRef.current;
+      if (!controller) return;
+      const targetOffset = Math.max(0, controller.getCursor().charOffset + deltaSeconds * ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 * rate);
+      const wordIndex = findWordIndexAtOrAfterOffset(loaded.doc.structure.words, targetOffset);
+      if (wordIndex !== null) controller.seekToWord(wordIndex);
+    },
+    [loaded, rate],
+  );
+
+  const handlePrevious = useCallback(() => {
+    const controller = controllerRef.current;
+    if (!controller) return;
+    if (listeningDefaults.skipBy === 'sentence') controller.previousSentence();
+    else if (listeningDefaults.skipBy === '15s') skipSeconds(-15);
+    else controller.previousParagraph();
+  }, [listeningDefaults.skipBy, skipSeconds]);
+
+  const handleNext = useCallback(() => {
+    const controller = controllerRef.current;
+    if (!controller) return;
+    if (listeningDefaults.skipBy === 'sentence') controller.nextSentence();
+    else if (listeningDefaults.skipBy === '15s') skipSeconds(15);
+    else controller.nextParagraph();
+  }, [listeningDefaults.skipBy, skipSeconds]);
 
   const handleDownloadOffline = useCallback(() => {
     if (!loaded || !voiceURI) return;
@@ -284,44 +317,15 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
     if (result) triggerDownload(result.blob, result.filename);
   }, [loaded, voiceURI, rate]);
 
-  // The currently-previewing engine, so a second preview click (same or
-  // different voice) stops whichever one is still speaking before starting
-  // the next — each engine's own speak() already self-cancels a prior
-  // utterance on the *same* engine, but not across engines.
-  const activePreviewEngineRef = useRef<{ cancel: () => void } | null>(null);
-
-  const handlePreviewVoice = useCallback(
-    (previewVoiceURI: string) => {
-      // Previewing is a real, separate playback action (not a derived
-      // value) — see lingxi-redesign/REDESIGN_BRIEF.md's decision notes.
-      // Pausing real playback first (same path the Pause button uses) keeps
-      // PlaybackController's own state consistent; a raw engine.speak()
-      // call would otherwise silently hijack the actual reading audio
-      // without the controller ever finding out, leaving it stuck
-      // believing it's still 'playing' once the preview ends.
-      if (controllerRef.current?.getState() === 'playing') controllerRef.current.pause();
-      activePreviewEngineRef.current?.cancel();
-
-      const engine = previewVoiceURI.startsWith(KOKORO_VOICE_PREFIX)
-        ? kokoroEngine
-        : previewVoiceURI.startsWith(EDGE_VOICE_PREFIX)
-          ? edgeEngine
-          : webSpeechEngine;
-      activePreviewEngineRef.current = engine;
-      engine.speak('This is a preview of this voice, reading at a normal pace.', {
-        voiceURI: previewVoiceURI,
-        rate: 1,
-        onWordBoundary: () => {},
-        onEnd: () => {
-          if (activePreviewEngineRef.current === engine) activePreviewEngineRef.current = null;
-        },
-        onError: () => {
-          if (activePreviewEngineRef.current === engine) activePreviewEngineRef.current = null;
-        },
-      });
-    },
-    [],
-  );
+  const handlePreviewVoice = useCallback((previewVoiceURI: string) => {
+    // Pausing real playback first (same path the Pause button uses) keeps
+    // PlaybackController's own state consistent; a raw engine.speak() call
+    // would otherwise silently hijack the actual reading audio without the
+    // controller ever finding out, leaving it stuck believing it's still
+    // 'playing' once the preview ends.
+    if (controllerRef.current?.getState() === 'playing') controllerRef.current.pause();
+    previewVoice(previewVoiceURI);
+  }, []);
 
   // Load the document, its text, the persisted reading cursor, and playback
   // settings (voice/speed) together, before anything playback-related is
@@ -363,6 +367,8 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
       initialCursor: loaded.cursor,
       initialVoiceURI: loaded.settings.selectedVoiceURI,
       initialRate: loaded.settings.playbackSpeed,
+      initialParagraphPauseMs: PARAGRAPH_PAUSE_MS[listeningDefaults.paragraphPause],
+      initialSkipArtifacts: listeningDefaults.skipArtifacts,
       ttsEngine,
       persistCursor: (cursor) => repository.saveCursor(cursor),
       persistSettings: (settings) => repository.savePlaybackSettings(loaded.doc.id, settings),
@@ -394,8 +400,24 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
     setApproximateHighlighting(false);
     setVoicesLoading(true);
 
+    if (listeningDefaults.sleepTimerDefault !== 'off') {
+      if (listeningDefaults.sleepTimerDefault === 'end-of-chapter') {
+        // Computed directly from the just-constructed controller's cursor and
+        // the already-fresh `chapters`/`totalChars` for this document — not
+        // via currentChapter/handleSetSleepTimer, which both lag a render
+        // behind inside this same effect (their state hasn't flushed yet).
+        const openChapter = findChapterAt(chapters, controller.getCursor().charOffset, totalChars);
+        if (openChapter) {
+          setSleepTimer({ type: 'end-of-chapter', label: 'End of chapter', chapterNumberAtSet: openChapter.number });
+        }
+      } else {
+        const minutes = listeningDefaults.sleepTimerDefault;
+        setSleepTimer({ type: 'minutes', label: `${minutes} min`, firesAt: Date.now() + minutes * 60_000 });
+      }
+    }
+
     controller.getVoices().then((fetchedVoices) => {
-      setVoices(fetchedVoices);
+      setVoices(filterVoicesByOnlinePolicy(fetchedVoices, listeningDefaults.allowOnlineVoices));
       setVoicesLoading(false);
       // Graceful fallback: a previously-selected voice can vanish (voice
       // pack removed, browser/OS update, moved to a machine without it).
@@ -546,8 +568,8 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
     // Matches the pill's prev/next buttons (brief: "← → previous/next
     // paragraph") — the old bottom bar's own prev/next buttons are
     // unaffected, still sentence-level, until it's deleted in [pill-cleanup].
-    onPrevious: () => controllerRef.current?.previousParagraph(),
-    onNext: () => controllerRef.current?.nextParagraph(),
+    onPrevious: handlePrevious,
+    onNext: handleNext,
     onSpeedDown: () => handleRateChange(Math.round((rate - 0.25) * 100) / 100),
     onSpeedUp: () => handleRateChange(Math.round((rate + 0.25) * 100) / 100),
     isMenuOpen: pillMenuOpen,
@@ -674,8 +696,8 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
                   onCloseMenu={() => setPillMenuOpen(false)}
                   onPlay={() => controllerRef.current?.play()}
                   onPause={() => controllerRef.current?.pause()}
-                  onPrevious={() => controllerRef.current?.previousParagraph()}
-                  onNext={() => controllerRef.current?.nextParagraph()}
+                  onPrevious={handlePrevious}
+                  onNext={handleNext}
                   onRateChange={handleRateChange}
                   voices={voices}
                   voiceURI={voiceURI}

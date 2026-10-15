@@ -102,3 +102,33 @@ describe('buildChunkFromWord vs buildChunkSequence (cache-key consistency)', () 
     }
   });
 });
+
+describe('ChunkWalkOptions', () => {
+  it('stopAtParagraphBoundary never merges two paragraphs into one chunk, even under a large target', () => {
+    const text = 'Para one sentence one. Para one sentence two.\n\nPara two sentence one. Para two sentence two.';
+    const structure = segmentText(text);
+    expect(structure.paragraphs.length).toBe(2);
+
+    const withoutOption = buildChunkSequence(structure, text, 900);
+    expect(withoutOption).toHaveLength(1); // sanity: would merge without the option
+
+    const chunks = buildChunkSequence(structure, text, 900, { stopAtParagraphBoundary: true });
+    expect(chunks).toHaveLength(2);
+    for (const chunk of chunks) {
+      const paragraphIndices = new Set(chunk.chunkWords.map((w) => w.paragraphIndex));
+      expect(paragraphIndices.size).toBe(1);
+    }
+  });
+
+  it('skipArtifacts excludes a standalone page-number paragraph from every chunk', () => {
+    const text = 'First paragraph sentence.\n\n12\n\nThird paragraph sentence.';
+    const structure = segmentText(text);
+    const pageNumberSentence = structure.sentences.find((s) => s.text.trim() === '12');
+    expect(pageNumberSentence).toBeDefined();
+
+    const chunks = buildChunkSequence(structure, text, 900, { skipArtifacts: true });
+    const allWords = chunks.flatMap((c) => c.chunkWords);
+    expect(allWords.some((w) => w.sentenceIndex === pageNumberSentence!.index)).toBe(false);
+    expect(chunks.some((c) => c.text.includes('12'))).toBe(false);
+  });
+});

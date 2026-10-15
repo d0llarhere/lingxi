@@ -11,7 +11,11 @@ function titleFromFilename(filename: string): string {
   return withoutExtension.trim().length > 0 ? withoutExtension : filename;
 }
 
-function initialCursor(documentId: string): ReadingCursor {
+// defaultVoiceURI/defaultSpeed are Listening settings' "Defaults for new
+// books" (see useListeningDefaults.ts) — applied once here, at creation,
+// not re-applied later: once a book exists it owns its own saved
+// voice/speed via the usual savePlaybackSettings path.
+function initialCursor(documentId: string, defaultVoiceURI?: string | null, defaultSpeed?: number): CursorRecord {
   return {
     documentId,
     wordIndex: 0,
@@ -20,13 +24,20 @@ function initialCursor(documentId: string): ReadingCursor {
     paragraphIndex: 0,
     sentenceIndex: 0,
     updatedAt: Date.now(),
+    ...(defaultVoiceURI !== undefined ? { selectedVoiceURI: defaultVoiceURI } : {}),
+    ...(defaultSpeed !== undefined ? { playbackSpeed: defaultSpeed } : {}),
   };
 }
 
 export class LibraryRepository {
   constructor(private readonly db: IDBPDatabase<LingxiDB>) {}
 
-  async createFromPastedText(title: string, text: string): Promise<LingxiDocument> {
+  async createFromPastedText(
+    title: string,
+    text: string,
+    defaultVoiceURI?: string | null,
+    defaultSpeed?: number,
+  ): Promise<LingxiDocument> {
     const now = Date.now();
     const doc: LingxiDocument = {
       id: crypto.randomUUID(),
@@ -42,7 +53,7 @@ export class LibraryRepository {
     await Promise.all([
       tx.objectStore('documents').put(doc),
       tx.objectStore('documentText').put({ documentId: doc.id, text }),
-      tx.objectStore('cursors').put(initialCursor(doc.id)),
+      tx.objectStore('cursors').put(initialCursor(doc.id, defaultVoiceURI, defaultSpeed)),
       tx.done,
     ]);
 
@@ -51,7 +62,7 @@ export class LibraryRepository {
 
   // Extraction runs to completion before any IndexedDB write is issued, so a
   // malformed PDF (extraction throws) leaves nothing persisted.
-  async createFromPdf(file: File): Promise<LingxiDocument> {
+  async createFromPdf(file: File, defaultVoiceURI?: string | null, defaultSpeed?: number): Promise<LingxiDocument> {
     const arrayBuffer = await file.arrayBuffer();
     const { text, pages, hasText } = await extractPdfText(arrayBuffer);
 
@@ -71,7 +82,7 @@ export class LibraryRepository {
     await Promise.all([
       tx.objectStore('documents').put(doc),
       tx.objectStore('documentText').put({ documentId: doc.id, text }),
-      tx.objectStore('cursors').put(initialCursor(doc.id)),
+      tx.objectStore('cursors').put(initialCursor(doc.id, defaultVoiceURI, defaultSpeed)),
       tx.objectStore('sourceFiles').put({
         documentId: doc.id,
         blob: file,

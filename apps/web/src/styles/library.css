@@ -1130,7 +1130,9 @@
   border: 1px solid var(--divider);
   border-radius: 14px;
   background: var(--surface-2);
-  overflow: hidden;
+  /* No overflow: hidden — it clipped the voice picker dropdown (Listening
+     settings) on rows near the bottom of the card. Same fix .doc-table
+     already uses: round the first/last row directly instead. */
 }
 
 .storage-row {
@@ -1143,6 +1145,11 @@
 
 .storage-row:first-child {
   border-top: 0;
+  border-radius: 14px 14px 0 0;
+}
+
+.storage-row:last-child {
+  border-radius: 0 0 14px 14px;
 }
 
 .storage-dot {
@@ -1236,4 +1243,35 @@
   text-align: right;
   font-size: var(--font-size-sm);
   font-weight: 700;
+}
+
+/* ---------- Settings → Listening ---------- */
+
+.voice-picker-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.voice-picker-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 190px;
+  justify-content: space-between;
+}
+
+.voice-picker-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }

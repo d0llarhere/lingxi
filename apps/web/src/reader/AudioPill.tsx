@@ -12,6 +12,7 @@ import { CloseIcon, ForwardIcon, MoreHorizontalIcon, RewindIcon } from '../compo
 import { getAudioLibraryRepository } from '../library/audioLibraryInstance';
 import { useApproxBookPosition } from '../library/useApproxBookPosition';
 import { useChapterDetection } from '../settings/useChapterDetection';
+import { useListeningDefaults } from '../settings/useListeningDefaults';
 import { AudioPillMenu, type AudioSleepTimerChoice } from './AudioPillMenu';
 import { formatDuration } from './formatDuration';
 import { cycleSpeed, PlayButton } from './pillPrimitives';
@@ -19,6 +20,8 @@ import { cycleSpeed, PlayButton } from './pillPrimitives';
 const PERSIST_INTERVAL_MS = 5000;
 const SKIP_SECONDS = 15;
 const SEEK_KEY_STEP_MS = 5000;
+// Listening settings' "Fade out at the end" — ramp over the last ~10s.
+const SLEEP_TIMER_FADE_MS = 10_000;
 
 type SleepTimer = { type: 'minutes'; label: string; firesAt: number } | { type: 'end-of-track' } | null;
 
@@ -124,8 +127,17 @@ export function AudioPill({ item, onClose, onPersisted }: AudioPillProps) {
   const [subtitleFilename, setSubtitleFilename] = useState(item.subtitleFilename);
   const [subtitleText, setSubtitleText] = useState(item.subtitleText);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [sleepTimer, setSleepTimer] = useState<SleepTimer>(null);
   const { settings: chapterDetection } = useChapterDetection();
+  const { defaults: listeningDefaults } = useListeningDefaults();
+  const fadeOutAtEnd = listeningDefaults.fadeOutAtEnd;
+  // Listening settings' "Default length" preselects this pill's sleep timer
+  // too — only the numeric choices map onto AudioPill's own options (no
+  // "end of chapter" concept for a plain audio file).
+  const [sleepTimer, setSleepTimer] = useState<SleepTimer>(() => {
+    const { sleepTimerDefault } = listeningDefaults;
+    if (typeof sleepTimerDefault !== 'number') return null;
+    return { type: 'minutes', label: `${sleepTimerDefault} min`, firesAt: Date.now() + sleepTimerDefault * 60_000 };
+  });
 
   const bookPosition = useApproxBookPosition(item.documentId, currentTimeMs, durationMs, chapterDetection);
 
@@ -197,17 +209,36 @@ export function AudioPill({ item, onClose, onPersisted }: AudioPillProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.title]);
 
-  // Fixed-duration sleep timer — same "pause once the deadline passes"
-  // mechanism as ReaderScreen's own sleep timer.
+  // Fixed-duration sleep timer — pauses once the deadline passes, same as
+  // ReaderScreen's own sleep timer. When "Fade out at the end" is on, a
+  // short interval (not a single setTimeout) ramps audio.volume down over
+  // the last ~10s instead of cutting to silence abruptly.
   useEffect(() => {
     if (!sleepTimer || sleepTimer.type !== 'minutes') return;
-    const msRemaining = sleepTimer.firesAt - Date.now();
-    const handle = window.setTimeout(() => {
-      audioRef.current?.pause();
-      setSleepTimer(null);
-    }, Math.max(0, msRemaining));
-    return () => window.clearTimeout(handle);
-  }, [sleepTimer]);
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = 1;
+
+    const tick = () => {
+      const msRemaining = sleepTimer.firesAt - Date.now();
+      if (msRemaining <= 0) {
+        audio.volume = 1;
+        audio.pause();
+        setSleepTimer(null);
+        return;
+      }
+      if (fadeOutAtEnd && msRemaining <= SLEEP_TIMER_FADE_MS) {
+        audio.volume = Math.max(0, msRemaining / SLEEP_TIMER_FADE_MS);
+      }
+    };
+
+    tick();
+    const handle = window.setInterval(tick, 250);
+    return () => {
+      window.clearInterval(handle);
+      audio.volume = 1;
+    };
+  }, [sleepTimer, fadeOutAtEnd]);
 
   function handlePlayPause() {
     const audio = audioRef.current;

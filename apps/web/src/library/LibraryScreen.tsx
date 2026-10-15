@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent 
 import { AppShell } from '../components/AppShell';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { GridIcon, ListIcon, SearchIcon, UploadIcon } from '../components/icons';
+import { readListeningDefaults } from '../settings/useListeningDefaults';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { AddMenu } from './AddMenu';
 import { DocumentCard, type DocumentCardData } from './DocumentCard';
@@ -68,7 +69,8 @@ export function LibraryScreen({ onOpenDocument, onNavigate }: LibraryScreenProps
 
   async function handlePasteSubmit(title: string, text: string) {
     if (!repository) return;
-    await repository.createFromPastedText(title, text);
+    const { defaultVoiceURI, defaultSpeed } = readListeningDefaults();
+    await repository.createFromPastedText(title, text, defaultVoiceURI, defaultSpeed);
     await refresh();
   }
 
@@ -78,7 +80,8 @@ export function LibraryScreen({ onOpenDocument, onNavigate }: LibraryScreenProps
     setImportingPdf(true);
     setError(null);
     try {
-      await repository.createFromPdf(file);
+      const { defaultVoiceURI, defaultSpeed } = readListeningDefaults();
+      await repository.createFromPdf(file, defaultVoiceURI, defaultSpeed);
     } catch (err) {
       // Logged so real extraction failures (encrypted/malformed PDFs, etc.)
       // are diagnosable instead of only ever showing the generic message.
@@ -130,7 +133,8 @@ export function LibraryScreen({ onOpenDocument, onNavigate }: LibraryScreenProps
       await importPdfFile(file);
     } else if (extension === 'txt') {
       const text = await file.text();
-      await repository.createFromPastedText(file.name.replace(/\.txt$/i, ''), text);
+      const { defaultVoiceURI, defaultSpeed } = readListeningDefaults();
+      await repository.createFromPastedText(file.name.replace(/\.txt$/i, ''), text, defaultVoiceURI, defaultSpeed);
       await refresh();
     } else {
       // EPUB and anything else isn't supported by any extractor in this

@@ -32,6 +32,20 @@ describe('LibraryRepository', () => {
     expect(doc.structure.words.length).toBeGreaterThan(0);
   });
 
+  it('applies Listening settings\' default voice/speed to a new document, when given', async () => {
+    const doc = await repo.createFromPastedText('My Doc', 'Hello world.', 'kokoro:af_bella', 1.25);
+    const settings = await repo.getPlaybackSettings(doc.id);
+    expect(settings.selectedVoiceURI).toBe('kokoro:af_bella');
+    expect(settings.playbackSpeed).toBe(1.25);
+  });
+
+  it('falls back to the usual defaults when no default voice/speed is given', async () => {
+    const doc = await repo.createFromPastedText('My Doc', 'Hello world.');
+    const settings = await repo.getPlaybackSettings(doc.id);
+    expect(settings.selectedVoiceURI).toBeNull();
+    expect(settings.playbackSpeed).toBe(1);
+  });
+
   it('retrieves a stored document and its text', async () => {
     const doc = await repo.createFromPastedText('Doc', 'Some content here.');
     const fetched = await repo.getDocument(doc.id);

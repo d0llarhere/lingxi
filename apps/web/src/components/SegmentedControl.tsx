@@ -1,11 +1,11 @@
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 
-export interface SegmentedOption<T extends string> {
+export interface SegmentedOption<T extends string | number> {
   value: T;
   label: ReactNode;
 }
 
-interface SegmentedControlProps<T extends string> {
+interface SegmentedControlProps<T extends string | number> {
   ariaLabel: string;
   options: SegmentedOption<T>[];
   value: T;
@@ -17,7 +17,7 @@ interface SegmentedControlProps<T extends string> {
 // (line spacing, text width, font, speed, skip-by, reduce motion, …), same
 // arrow-key-navigation pattern SettingsScreen.tsx's Chapters radiogroup
 // already uses.
-export function SegmentedControl<T extends string>({ ariaLabel, options, value, onChange }: SegmentedControlProps<T>) {
+export function SegmentedControl<T extends string | number>({ ariaLabel, options, value, onChange }: SegmentedControlProps<T>) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
 
   function handleKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {

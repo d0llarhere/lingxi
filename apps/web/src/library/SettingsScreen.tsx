@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { ListIcon } from '../components/icons';
 import { ChaptersSection } from './ChaptersSection';
+import { ListeningSection } from './ListeningSection';
 import { ReadingSection } from './ReadingSection';
 import { type NavKey, Sidebar } from './Sidebar';
 import { StorageSection } from './StorageSection';
 
 // Nav order per docs/lingxi-part3/BRIEF_SETTINGS_PAGES.md: Reading ·
 // Listening · Chapters · Storage · Appearance · About.
-export type SettingsSection = 'reading' | 'chapters' | 'storage';
+export type SettingsSection = 'reading' | 'listening' | 'chapters' | 'storage';
 
 const NAV_ITEMS: { key: SettingsSection; label: string }[] = [
   { key: 'reading', label: 'Reading' },
+  { key: 'listening', label: 'Listening' },
   { key: 'chapters', label: 'Chapters' },
   { key: 'storage', label: 'Storage' },
 ];
@@ -42,9 +44,9 @@ export function SettingsScreen({ onNavigate, initialSection }: SettingsScreenPro
         <div className="settings-layout">
           <nav aria-label="Settings sections" className="settings-nav">
             <div className="settings-nav-title">Settings</div>
-            {/* Listening/Appearance/About land here as their own commits —
-                the brief's own rule is to leave undefined sections out of the
-                nav rather than show an empty page. */}
+            {/* Appearance/About land here as their own commits — the brief's
+                own rule is to leave undefined sections out of the nav rather
+                than show an empty page. */}
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.key}
@@ -60,6 +62,8 @@ export function SettingsScreen({ onNavigate, initialSection }: SettingsScreenPro
           <main className="settings-main">
             {section === 'reading' ? (
               <ReadingSection />
+            ) : section === 'listening' ? (
+              <ListeningSection />
             ) : section === 'storage' ? (
               <StorageSection onOpenLibrary={() => onNavigate('library')} />
             ) : (
