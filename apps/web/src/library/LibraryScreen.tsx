@@ -201,9 +201,7 @@ export function LibraryScreen({ onOpenDocument, onNavigate }: LibraryScreenProps
           >
             <ListIcon />
           </button>
-          <span className="brand">
-            <span className="brand-mark">灵</span>Lingxi
-          </span>
+          <span className="brand">Library</span>
         </>
       }
       end={

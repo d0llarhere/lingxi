@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-function formatBytes(bytes: number): string {
+export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   const units = ['KB', 'MB', 'GB', 'TB'];
   let value = bytes / 1024;
@@ -12,9 +12,15 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unit]}`;
 }
 
+interface StorageCardProps {
+  onManage: () => void;
+}
+
 // navigator.storage.estimate() isn't available everywhere (e.g. Safari
-// private mode) — hide the card rather than show a broken/empty one.
-export function OfflineStorageCard() {
+// private mode) — hide the card rather than show a broken/empty one. Only
+// rendered on the Downloads page (see Sidebar.tsx); the whole card is a
+// link to Settings → Storage (lingxi-part2/BRIEF_SIDEBAR_DOWNLOADS_STORAGE.md).
+export function StorageCard({ onManage }: StorageCardProps) {
   const [estimate, setEstimate] = useState<{ usage: number; quota: number } | null>(null);
 
   useEffect(() => {
@@ -30,14 +36,22 @@ export function OfflineStorageCard() {
   const percent = Math.min(100, Math.round((estimate.usage / estimate.quota) * 100));
 
   return (
-    <div className="sidebar-storage-card">
-      <div className="sidebar-storage-label">Offline storage</div>
+    <button
+      type="button"
+      className="sidebar-storage-card"
+      onClick={onManage}
+      aria-label={`Storage: ${formatBytes(estimate.usage)} of ${formatBytes(estimate.quota)} used. Manage in Settings`}
+    >
+      <div className="sidebar-storage-header">
+        <span>Storage</span>
+        <span className="sidebar-storage-manage">Manage ›</span>
+      </div>
       <div className="sidebar-storage-bar">
         <div className="sidebar-storage-fill" style={{ width: `${percent}%` }} />
       </div>
       <div className="sidebar-storage-value">
         {formatBytes(estimate.usage)} of {formatBytes(estimate.quota)}
       </div>
-    </div>
+    </button>
   );
 }

@@ -1,14 +1,11 @@
-import { BookmarkIcon, DownloadIcon, HeadphonesIcon, LibraryIcon, MicIcon, SettingsIcon } from '../components/icons';
-import { OfflineStorageCard } from './OfflineStorageCard';
+import { DownloadIcon, LibraryIcon, SettingsIcon } from '../components/icons';
+import { StorageCard } from './StorageCard';
 
-export type NavKey = 'library' | 'listening' | 'downloads' | 'bookmarks' | 'voices' | 'settings';
+export type NavKey = 'library' | 'downloads' | 'settings';
 
 const NAV_ITEMS: { key: NavKey; label: string; icon: JSX.Element }[] = [
   { key: 'library', label: 'Library', icon: <LibraryIcon width={18} height={18} /> },
-  { key: 'listening', label: 'Listening', icon: <HeadphonesIcon width={18} height={18} /> },
   { key: 'downloads', label: 'Downloads', icon: <DownloadIcon width={18} height={18} /> },
-  { key: 'bookmarks', label: 'Bookmarks', icon: <BookmarkIcon width={18} height={18} /> },
-  { key: 'voices', label: 'Voices', icon: <MicIcon width={18} height={18} /> },
 ];
 
 interface SidebarProps {
@@ -45,7 +42,7 @@ export function Sidebar({ active, onNavigate, open, onClose }: SidebarProps) {
           </button>
         ))}
         <div className="sidebar-spacer" />
-        <OfflineStorageCard />
+        {active === 'downloads' && <StorageCard onManage={() => navigate('settings')} />}
         <button
           type="button"
           className={`sidebar-nav${active === 'settings' ? ' sidebar-nav-active' : ''}`}

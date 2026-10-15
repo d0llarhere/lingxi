@@ -4,16 +4,16 @@ import { ListIcon } from '../components/icons';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { type NavKey, Sidebar } from './Sidebar';
 
-const TITLES: Record<Exclude<NavKey, 'library'>, string> = {
-  listening: 'Listening',
+// The only remaining placeholder route — App.tsx already routes
+// 'library'/'settings' to their own real screens, so this is always
+// 'downloads' until commit [downloads-screen] gives it a real one too
+// (at which point this whole file goes away).
+const TITLES: Record<'downloads', string> = {
   downloads: 'Downloads',
-  bookmarks: 'Bookmarks',
-  voices: 'Voices',
-  settings: 'Settings',
 };
 
 interface PlaceholderScreenProps {
-  nav: Exclude<NavKey, 'library'>;
+  nav: 'downloads';
   onNavigate: (nav: NavKey) => void;
 }
 
