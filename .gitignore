@@ -2,3 +2,11 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# AI tool configs
+.agent/
+.agents/
+.claude/
+.codex/
+.gemini/
+.opencode/
