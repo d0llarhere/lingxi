@@ -3,10 +3,14 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { AlertTriangleIcon, CheckIcon, ListIcon } from '../components/icons';
 import { useChapterDetection } from '../settings/useChapterDetection';
 import { type NavKey, Sidebar } from './Sidebar';
+import { StorageSection } from './StorageSection';
 import { useLibrary } from './LibraryProvider';
 
+export type SettingsSection = 'chapters' | 'storage';
+
 interface SettingsScreenProps {
-  onNavigate: (nav: NavKey) => void;
+  onNavigate: (nav: NavKey, settingsSection?: SettingsSection) => void;
+  initialSection?: SettingsSection;
 }
 
 const MODE_OPTIONS: { value: ChapterDetectionMode; label: string; description: string; example: string }[] = [
@@ -73,8 +77,9 @@ function suggestFromHeadingLike(line: string): { label: string; prefix: string }
   return null;
 }
 
-export function SettingsScreen({ onNavigate }: SettingsScreenProps) {
+export function SettingsScreen({ onNavigate, initialSection }: SettingsScreenProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [section, setSection] = useState<SettingsSection>(initialSection ?? 'chapters');
   const { settings, setSettings } = useChapterDetection();
   const { repository } = useLibrary();
   const radioRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -160,12 +165,30 @@ export function SettingsScreen({ onNavigate }: SettingsScreenProps) {
         <div className="settings-layout">
           <nav aria-label="Settings sections" className="settings-nav">
             <div className="settings-nav-title">Settings</div>
-            {/* Only Chapters has settings defined yet — the brief's own rule
-                is to leave undefined sections out of the nav rather than
-                show an empty page for Reading/Listening/Storage/etc. */}
-            <div className="settings-nav-item settings-nav-item-active">Chapters</div>
+            {/* Only Chapters and Storage have settings defined yet — the
+                brief's own rule is to leave undefined sections out of the
+                nav rather than show an empty page for Reading/Listening/etc. */}
+            <button
+              type="button"
+              className={`settings-nav-item${section === 'chapters' ? ' settings-nav-item-active' : ''}`}
+              onClick={() => setSection('chapters')}
+            >
+              Chapters
+            </button>
+            <button
+              type="button"
+              className={`settings-nav-item${section === 'storage' ? ' settings-nav-item-active' : ''}`}
+              onClick={() => setSection('storage')}
+            >
+              Storage
+            </button>
           </nav>
 
+          {section === 'storage' ? (
+            <main className="settings-main">
+              <StorageSection onOpenLibrary={() => onNavigate('library')} />
+            </main>
+          ) : (
           <main className="settings-main">
             <div>
               <h1 className="settings-h1">Chapters</h1>
@@ -335,6 +358,7 @@ export function SettingsScreen({ onNavigate }: SettingsScreenProps) {
               Changes save automatically
             </div>
           </main>
+          )}
         </div>
       </div>
     </div>

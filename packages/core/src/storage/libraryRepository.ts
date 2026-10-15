@@ -88,6 +88,15 @@ export class LibraryRepository {
     return this.db.get('documents', id);
   }
 
+  // Settings→Storage's "Book files" row: PDFs' own blob size plus the
+  // extracted text every document (PDF or pasted) keeps in `documentText`.
+  async getBookFilesSize(): Promise<number> {
+    const [sourceFiles, textRecords] = await Promise.all([this.db.getAll('sourceFiles'), this.db.getAll('documentText')]);
+    const sourceBytes = sourceFiles.reduce((sum, file) => sum + file.blob.size, 0);
+    const textBytes = textRecords.reduce((sum, record) => sum + new Blob([record.text]).size, 0);
+    return sourceBytes + textBytes;
+  }
+
   async getDocumentText(id: string): Promise<string | undefined> {
     const record = await this.db.get('documentText', id);
     return record?.text;

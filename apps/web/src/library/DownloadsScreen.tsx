@@ -9,6 +9,7 @@ import { ThemeToggle } from '../theme/ThemeToggle';
 import { getAudioLibraryRepository } from './audioLibraryInstance';
 import { DownloadRow } from './DownloadRow';
 import { RenameDialog } from './RenameDialog';
+import type { SettingsSection } from './SettingsScreen';
 import { Sidebar, type NavKey } from './Sidebar';
 
 type Filter = 'all' | 'book' | 'imported';
@@ -54,7 +55,7 @@ function sortCompare(a: AudioItemRecord, b: AudioItemRecord, key: SortKey): numb
 }
 
 interface DownloadsScreenProps {
-  onNavigate: (nav: NavKey) => void;
+  onNavigate: (nav: NavKey, settingsSection?: SettingsSection) => void;
 }
 
 export function DownloadsScreen({ onNavigate }: DownloadsScreenProps) {
@@ -183,7 +184,7 @@ export function DownloadsScreen({ onNavigate }: DownloadsScreenProps) {
       detail: 'mp3, m4a, wav',
     },
     { label: 'Sort by', icon: <SortIcon />, onSelect: cycleSort, detail: `${SORT_LABELS[sort]} ›` },
-    { label: 'Manage storage', icon: <SettingsIcon />, onSelect: () => onNavigate('settings') },
+    { label: 'Manage storage', icon: <SettingsIcon />, onSelect: () => onNavigate('settings', 'storage') },
   ];
 
   return (

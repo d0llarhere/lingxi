@@ -66,6 +66,12 @@ describe('LibraryRepository', () => {
     expect(await repo.getCursor(doc.id)).toBeUndefined();
   });
 
+  it('getBookFilesSize sums every document text (pasted-text has no sourceFiles blob)', async () => {
+    await repo.createFromPastedText('Doc', 'Hello world');
+    const size = await repo.getBookFilesSize();
+    expect(size).toBe(new Blob(['Hello world']).size);
+  });
+
   it('creates an initial reading cursor alongside the document', async () => {
     const doc = await repo.createFromPastedText('Doc', 'One. Two. Three.');
     const cursor = await repo.getCursor(doc.id);

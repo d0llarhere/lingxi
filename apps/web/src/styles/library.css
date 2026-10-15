@@ -1074,3 +1074,129 @@
     transform: scaleY(1);
   }
 }
+
+/* ---------- Settings → Storage ---------- */
+
+.settings-nav-item {
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  font-family: inherit;
+}
+
+.storage-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.storage-summary-figure {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.storage-summary-used {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.storage-summary-available {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.storage-bar {
+  height: 12px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  display: flex;
+  overflow: hidden;
+  gap: 2px;
+}
+
+.storage-bar-segment {
+  height: 100%;
+}
+
+.storage-note {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.storage-card {
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.storage-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--divider);
+}
+
+.storage-row:first-child {
+  border-top: 0;
+}
+
+.storage-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.storage-row-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.storage-row-title {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.storage-row-desc {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.storage-row-size {
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  width: 72px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.storage-audio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.storage-audio-selection {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.storage-audio-selection-count {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.storage-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--danger);
+  flex-shrink: 0;
+}

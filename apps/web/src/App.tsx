@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { DownloadsScreen } from './library/DownloadsScreen';
 import { LibraryProvider } from './library/LibraryProvider';
 import { LibraryScreen } from './library/LibraryScreen';
-import { SettingsScreen } from './library/SettingsScreen';
+import { SettingsScreen, type SettingsSection } from './library/SettingsScreen';
 import type { NavKey } from './library/Sidebar';
 import { ReaderScreen } from './reader/ReaderScreen';
 
-type View = { type: 'nav'; nav: NavKey } | { type: 'reader'; documentId: string; autoplay?: boolean };
+type View =
+  | { type: 'nav'; nav: NavKey; settingsSection?: SettingsSection }
+  | { type: 'reader'; documentId: string; autoplay?: boolean };
 
 export function App() {
   const [view, setView] = useState<View>({ type: 'nav', nav: 'library' });
@@ -23,17 +25,21 @@ export function App() {
     );
   }
 
+  function navigate(nav: NavKey, settingsSection?: SettingsSection) {
+    setView({ type: 'nav', nav, settingsSection });
+  }
+
   return (
     <LibraryProvider>
       {view.nav === 'library' ? (
         <LibraryScreen
           onOpenDocument={(documentId, options) => setView({ type: 'reader', documentId, autoplay: options?.autoplay })}
-          onNavigate={(nav) => setView({ type: 'nav', nav })}
+          onNavigate={navigate}
         />
       ) : view.nav === 'settings' ? (
-        <SettingsScreen onNavigate={(nav) => setView({ type: 'nav', nav })} />
+        <SettingsScreen onNavigate={navigate} initialSection={view.settingsSection} />
       ) : (
-        <DownloadsScreen onNavigate={(nav) => setView({ type: 'nav', nav })} />
+        <DownloadsScreen onNavigate={navigate} />
       )}
     </LibraryProvider>
   );
