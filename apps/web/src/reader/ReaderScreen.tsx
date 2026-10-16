@@ -12,6 +12,7 @@ import {
 } from '@lingxi/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { Toast } from '../components/Toast';
 import { collectCachedSegments } from '../export/collectCachedSegments';
 import { exportAudio } from '../export/exportAudio';
 import { exportSrt } from '../export/exportSrt';
@@ -22,6 +23,7 @@ import { RenameDialog } from '../library/RenameDialog';
 import { useChapterDetection } from '../settings/useChapterDetection';
 import { filterVoicesByOnlinePolicy, PARAGRAPH_PAUSE_MS, useListeningDefaults } from '../settings/useListeningDefaults';
 import { useReadingSettings } from '../settings/useReadingSettings';
+import { OfflineCacheMissError } from '../tts/CachingTTSEngine';
 import { ariaWakeTracker, EDGE_VOICE_PREFIX } from '../tts/edge/EdgeTTSEngine';
 import { offlineDownloader } from '../tts/offlineDownload';
 import { previewVoice } from '../tts/previewVoice';
@@ -105,7 +107,11 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
   const [approximateHighlighting, setApproximateHighlighting] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  // startAfterChapterNumber set only when opened from the offline toast's
+  // "Download more" action, to pre-fill Chapters mode starting right after
+  // the chapter playback stalled on.
+  const [downloadDialog, setDownloadDialog] = useState<{ startAfterChapterNumber?: number } | null>(null);
+  const [offlineToast, setOfflineToast] = useState<{ message: string; chapterNumber: number | null } | null>(null);
   const [tocOpen, setTocOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -382,7 +388,22 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
         const word = loaded.doc.structure.words[wordIndex];
         if (word) wordTextRef.current?.setActiveSentence(word.sentenceIndex);
       },
-      onPersistError: (error) => console.error('Failed to persist playback state', error),
+      onPersistError: (error) => {
+        if (error instanceof OfflineCacheMissError) {
+          // Computed directly from the controller's own live cursor (not
+          // currentChapter, a React state value that can lag a render
+          // behind an error that fires synchronously off a cursor change)
+          // and the already-fresh chapters/totalChars for this document —
+          // same reasoning as the end-of-chapter sleep timer default above.
+          const chapterInfo = findChapterAt(chapters, controller.getCursor().charOffset, totalChars);
+          setOfflineToast({
+            message: chapterInfo ? `Not downloaded past Ch. ${chapterInfo.number}` : 'Not downloaded past this point',
+            chapterNumber: chapterInfo?.number ?? null,
+          });
+          return;
+        }
+        console.error('Failed to persist playback state', error);
+      },
     });
 
     controllerRef.current = controller;
@@ -709,7 +730,7 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
                   offlineDownloadStatus={offlineDownloadStatus}
                   onDownloadOffline={() => {
                     setPillMenuOpen(false);
-                    setDownloadDialogOpen(true);
+                    setDownloadDialog({});
                   }}
                   cacheStatus={cacheStatus}
                   onExportAudio={handleExportAudio}
@@ -725,7 +746,24 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
         <RenameDialog initialTitle={doc.title} onClose={() => setRenaming(false)} onSubmit={handleRenameSubmit} />
       )}
 
-      {downloadDialogOpen && <DownloadRangeDialog documentId={documentId} onClose={() => setDownloadDialogOpen(false)} />}
+      {downloadDialog && (
+        <DownloadRangeDialog
+          documentId={documentId}
+          startAfterChapterNumber={downloadDialog.startAfterChapterNumber}
+          onClose={() => setDownloadDialog(null)}
+        />
+      )}
+
+      {offlineToast && (
+        <Toast
+          message={offlineToast.message}
+          onDismiss={() => setOfflineToast(null)}
+          action={{
+            label: 'Download more',
+            onClick: () => setDownloadDialog({ startAfterChapterNumber: offlineToast.chapterNumber ?? undefined }),
+          }}
+        />
+      )}
 
       {deleting && (
         <ConfirmDialog

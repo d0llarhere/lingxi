@@ -10,6 +10,21 @@ function isCacheableVoice(voiceURI: string | null): voiceURI is string {
   return voiceURI.startsWith(KOKORO_VOICE_PREFIX) || voiceURI.startsWith(EDGE_VOICE_PREFIX);
 }
 
+// Thrown by ensureCached (live-playback path only — see its `gateOffline`
+// param) instead of attempting synthesis, when offline and the text isn't
+// already cached. Deliberately thrown even for Kokoro, which *could*
+// technically still synthesize locally while offline: "offline" is meant to
+// mean "only what you downloaded," predictably, regardless of which engine
+// the current voice happens to use — see
+// docs/lingxi-part4/BRIEF_DOWNLOAD_RANGES.md ("pause and show a toast").
+// ReaderScreen's onPersistError special-cases this type to show that toast.
+export class OfflineCacheMissError extends Error {
+  constructor() {
+    super('This part of the book is not downloaded, and you are offline.');
+    this.name = 'OfflineCacheMissError';
+  }
+}
+
 // Wraps the existing routing engine with a content-addressed audio cache —
 // implements the same TTSEngine contract (interface unchanged) so
 // PlaybackController needs no changes. Only kokoro:/edge: voices are
@@ -47,7 +62,7 @@ export class CachingTTSEngine implements TTSEngine {
   }
 
   private async runCached(text: string, opts: SpeakOptions, voiceURI: string, token: number): Promise<void> {
-    const record = await this.ensureCached(text, voiceURI, opts.rate);
+    const record = await this.ensureCached(text, voiceURI, opts.rate, { gateOffline: true });
     if (token !== this.activeToken) return;
 
     this.activeHandle = playAudioSegment(record.audioBlob, text, record.words, {
@@ -67,12 +82,20 @@ export class CachingTTSEngine implements TTSEngine {
   // (and export, once a document is fully cached) uses to populate the
   // cache ahead of/independent from live playback. Also the cache-miss path
   // speak() itself falls through to.
-  async ensureCached(text: string, voiceURI: string, rate: number): Promise<SegmentCacheRecord> {
+  //
+  // `gateOffline` is only ever set by the live-playback path (runCached) —
+  // offline-download deliberately leaves it unset, so a Kokoro-based
+  // download (local inference, no network needed) keeps working even while
+  // offline; an Edge-based one still fails on its own, honestly, via a real
+  // network error from fetchAudio.
+  async ensureCached(text: string, voiceURI: string, rate: number, options?: { gateOffline?: boolean }): Promise<SegmentCacheRecord> {
     const key = await hashText([text, voiceURI, String(rate)]);
     const repo = await getSegmentCacheRepository();
 
     const existing = await repo.getSegment(key);
     if (existing) return existing;
+
+    if (options?.gateOffline && !navigator.onLine) throw new OfflineCacheMissError();
 
     const record = await this.generate(text, voiceURI, rate, key);
     await repo.putSegment(record);
