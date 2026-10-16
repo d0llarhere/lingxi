@@ -188,7 +188,7 @@ export function PlaybackMenu({
               <span className="pill-mi-text">
                 Download for offline
                 <span className="pill-mi-sub">
-                  {!offlineDownloadStatus && 'Not downloaded'}
+                  {!offlineDownloadStatus && (cacheStatus?.fullyCached ? 'Saved for offline' : 'Not downloaded')}
                   {offlineDownloadStatus?.status === 'queued' && 'Queued'}
                   {offlineDownloadStatus?.status === 'paused' && 'Paused'}
                   {offlineDownloadStatus?.status === 'downloading' && `Downloading · ${Math.round(offlineDownloadStatus.progress * 100)}%`}

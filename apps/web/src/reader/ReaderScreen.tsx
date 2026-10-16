@@ -1,5 +1,4 @@
 import {
-  buildChunkSequence,
   detectChapters,
   findPageIndexAtOffset,
   findWordIndexAtOrAfterOffset,
@@ -17,6 +16,7 @@ import { collectCachedSegments } from '../export/collectCachedSegments';
 import { exportAudio } from '../export/exportAudio';
 import { exportSrt } from '../export/exportSrt';
 import { triggerDownload } from '../export/triggerDownload';
+import { DownloadRangeDialog } from '../library/DownloadRangeDialog';
 import { useLibrary } from '../library/LibraryProvider';
 import { RenameDialog } from '../library/RenameDialog';
 import { useChapterDetection } from '../settings/useChapterDetection';
@@ -105,6 +105,7 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
   const [approximateHighlighting, setApproximateHighlighting] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -187,15 +188,6 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
     else controller.nextParagraph();
   }, [listeningDefaults.skipBy, skipSeconds]);
 
-  // Interim whole-book trigger — replaced by the range dialog (Whole
-  // book/Chapters/Pages) in a follow-up commit; for now this just keeps the
-  // existing whole-book behavior working against the new queue API.
-  const handleDownloadOffline = useCallback(() => {
-    if (!loaded || !voiceURI) return;
-    const totalChunks = buildChunkSequence(loaded.doc.structure, loaded.text).length;
-    if (totalChunks === 0) return;
-    void offlineDownloader.enqueue(loaded.doc, voiceURI, rate, { fromChunkIndex: 0, toChunkIndex: totalChunks - 1 });
-  }, [loaded, voiceURI, rate]);
 
   // Raw chapter detection, memoized once (detectChapters scans the whole
   // document text) and shared by the TOC fallback and the pill player's
@@ -715,7 +707,10 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
                   kokoroStatus={kokoroStatus}
                   onDownloadKokoro={handleDownloadKokoro}
                   offlineDownloadStatus={offlineDownloadStatus}
-                  onDownloadOffline={handleDownloadOffline}
+                  onDownloadOffline={() => {
+                    setPillMenuOpen(false);
+                    setDownloadDialogOpen(true);
+                  }}
                   cacheStatus={cacheStatus}
                   onExportAudio={handleExportAudio}
                   onExportSrt={handleExportSrt}
@@ -729,6 +724,8 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
       {renaming && (
         <RenameDialog initialTitle={doc.title} onClose={() => setRenaming(false)} onSubmit={handleRenameSubmit} />
       )}
+
+      {downloadDialogOpen && <DownloadRangeDialog documentId={documentId} onClose={() => setDownloadDialogOpen(false)} />}
 
       {deleting && (
         <ConfirmDialog
