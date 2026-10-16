@@ -43,5 +43,7 @@ export type { AudioItemRecord, DocumentTextRecord, SourceFileRecord } from './st
 export { SegmentCacheRepository } from './storage/segmentCache';
 export type { SegmentCacheRecord, WordAnchor } from './storage/segmentCache';
 export { AudioLibraryRepository } from './storage/audioLibrary';
+export { DownloadJobRepository } from './storage/downloadJob';
+export type { DownloadJobRecord } from './storage/downloadJob';
 export { parseSrt, parseSubtitleFile, parseVtt } from './subtitles/parseSubtitles';
 export type { SubtitleCue } from './subtitles/parseSubtitles';

@@ -1,10 +1,11 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { LingxiDocument, PlaybackSettings, ReadingCursor } from '../model/types';
+import type { DownloadJobRecord } from './downloadJob';
 import type { AudioItemRecord, DocumentTextRecord, SourceFileRecord } from './records';
 import type { SegmentCacheRecord } from './segmentCache';
 
 export const DB_NAME = 'lingxi-db';
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 // One record per document, combining ReadingCursor and PlaybackSettings (see
 // ARCHITECTURE.md §9) since both are per-document and voice/speed changes are
@@ -20,6 +21,7 @@ export interface LingxiDB extends DBSchema {
   sourceFiles: { key: string; value: SourceFileRecord };
   segmentCache: { key: string; value: SegmentCacheRecord };
   audioItems: { key: string; value: AudioItemRecord; indexes: { documentId: string } };
+  downloadJobs: { key: string; value: DownloadJobRecord };
 }
 
 export function openLingxiDB(name: string = DB_NAME): Promise<IDBPDatabase<LingxiDB>> {
@@ -45,6 +47,9 @@ export function openLingxiDB(name: string = DB_NAME): Promise<IDBPDatabase<Lingx
         // match an imported item.
         const store = db.createObjectStore('audioItems', { keyPath: 'id' });
         store.createIndex('documentId', 'documentId');
+      }
+      if (oldVersion < 4) {
+        db.createObjectStore('downloadJobs', { keyPath: 'id' });
       }
     },
   });

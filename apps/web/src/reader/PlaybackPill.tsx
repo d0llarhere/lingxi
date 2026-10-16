@@ -1,7 +1,7 @@
 import type { PlaybackState, VoiceInfo } from '@lingxi/core';
 import { MoreHorizontalIcon, NextIcon, PreviousIcon } from '../components/icons';
 import type { KokoroStatusSnapshot } from '../tts/kokoro/KokoroTTSEngine';
-import type { OfflineDownloadSnapshot } from '../tts/offlineDownload';
+import type { DownloadJobSnapshot } from '../tts/offlineDownload';
 import { formatDuration } from './formatDuration';
 import { PlaybackMenu, type SleepTimerChoice } from './PlaybackMenu';
 import { cycleSpeed, PlayButton } from './pillPrimitives';
@@ -39,7 +39,7 @@ export interface PlaybackPillProps {
   onSetSleepTimer: (choice: SleepTimerChoice) => void;
   kokoroStatus: KokoroStatusSnapshot;
   onDownloadKokoro: () => void;
-  offlineDownloadStatus: OfflineDownloadSnapshot;
+  offlineDownloadStatus: DownloadJobSnapshot | null;
   onDownloadOffline: () => void;
   cacheStatus: { fullyCached: boolean; allAria: boolean } | null;
   onExportAudio: () => void;

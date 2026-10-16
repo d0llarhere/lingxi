@@ -1,4 +1,4 @@
-import { detectChapters, type ChapterRef } from '@lingxi/core';
+import { buildChunkSequence, detectChapters, type ChapterRef } from '@lingxi/core';
 import { useEffect, useState } from 'react';
 import { DownloadIcon, EditIcon, PlayIcon, TrashIcon } from '../components/icons';
 import { OverflowMenu } from '../components/OverflowMenu';
@@ -92,12 +92,17 @@ export function DocumentRow({ data, onOpen, onPlay, onRename, onDelete }: Docume
   const sourceLabel = doc.sourceType === 'pdf' ? 'PDF' : 'Text';
   const positionLabel = progress <= 0 ? 'not started' : chapter ? `Chapter ${chapter.number} · ${chapter.title}` : `${percent}% read`;
 
+  // Interim whole-book trigger — replaced by the range dialog (Whole
+  // book/Chapters/Pages) in a follow-up commit; for now this just keeps the
+  // existing whole-book behavior working against the new queue API.
   async function handleDownloadOffline() {
     if (!repository) return;
     const [text, settings] = await Promise.all([repository.getDocumentText(doc.id), repository.getPlaybackSettings(doc.id)]);
     const voiceURI = settings.selectedVoiceURI;
     if (!text || !voiceURI) return;
-    void offlineDownloader.download(doc, text, voiceURI, settings.playbackSpeed);
+    const totalChunks = buildChunkSequence(doc.structure, text).length;
+    if (totalChunks === 0) return;
+    void offlineDownloader.enqueue(doc, voiceURI, settings.playbackSpeed, { fromChunkIndex: 0, toChunkIndex: totalChunks - 1 });
   }
 
   const menuActions = [

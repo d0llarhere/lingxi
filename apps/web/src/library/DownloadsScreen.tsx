@@ -121,6 +121,8 @@ export function DownloadsScreen({ onNavigate }: DownloadsScreenProps) {
         documentId: null,
         voiceURI: null,
         chapterLabel: null,
+        chunkRanges: [],
+        audioReady: true,
       });
     }
     setImporting(false);

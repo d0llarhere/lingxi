@@ -35,6 +35,8 @@ function sampleItem(overrides: Partial<AudioItemRecord> = {}): AudioItemRecord {
     documentId: null,
     voiceURI: null,
     chapterLabel: null,
+    chunkRanges: [],
+    audioReady: true,
     ...overrides,
   };
 }
@@ -113,6 +115,89 @@ describe('AudioLibraryRepository', () => {
 
     const remaining = await repo.listAudioItems();
     expect(remaining.map((i) => i.id)).toEqual(['imported-1']);
+  });
+
+  it('getAudioItem/listAudioItems default missing chunkRanges/audioReady for pre-migration records', async () => {
+    const legacy = sampleItem({ id: 'legacy' });
+    delete (legacy as Partial<AudioItemRecord>).chunkRanges;
+    delete (legacy as Partial<AudioItemRecord>).audioReady;
+    await db.put('audioItems', legacy);
+
+    const fetched = await repo.getAudioItem('legacy');
+    expect(fetched?.chunkRanges).toEqual([]);
+    expect(fetched?.audioReady).toBe(true);
+
+    const listed = await repo.listAudioItems();
+    expect(listed[0]?.chunkRanges).toEqual([]);
+    expect(listed[0]?.audioReady).toBe(true);
+  });
+
+  describe('mergeDownloadedRange', () => {
+    it('creates a new book record on the first download, not audioReady', async () => {
+      const record = await repo.mergeDownloadedRange({
+        id: 'book-1',
+        documentId: 'doc-1',
+        title: 'My Book',
+        voiceURI: 'kokoro:af_bella',
+        rate: 1,
+        range: { fromChunkIndex: 5, toChunkIndex: 9 },
+        addedSizeBytes: 1000,
+        addedDurationMs: 30_000,
+      });
+
+      expect(record.kind).toBe('book');
+      expect(record.audioReady).toBe(false);
+      expect(record.chunkRanges).toEqual([{ fromChunkIndex: 5, toChunkIndex: 9 }]);
+      expect(record.sizeBytes).toBe(1000);
+      expect(record.durationMs).toBe(30_000);
+    });
+
+    it('merges a second overlapping/adjacent range into existing coverage and sums bytes', async () => {
+      await repo.mergeDownloadedRange({
+        id: 'book-1',
+        documentId: 'doc-1',
+        title: 'My Book',
+        voiceURI: 'kokoro:af_bella',
+        rate: 1,
+        range: { fromChunkIndex: 5, toChunkIndex: 9 },
+        addedSizeBytes: 1000,
+        addedDurationMs: 30_000,
+      });
+      const record = await repo.mergeDownloadedRange({
+        id: 'book-1',
+        documentId: 'doc-1',
+        title: 'My Book',
+        voiceURI: 'kokoro:af_bella',
+        rate: 1,
+        range: { fromChunkIndex: 10, toChunkIndex: 15 },
+        addedSizeBytes: 500,
+        addedDurationMs: 10_000,
+      });
+
+      expect(record.chunkRanges).toEqual([{ fromChunkIndex: 5, toChunkIndex: 15 }]);
+      expect(record.sizeBytes).toBe(1500);
+      expect(record.durationMs).toBe(40_000);
+    });
+  });
+
+  describe('resetChunkRangesForAllBooks', () => {
+    it('clears chunkRanges on partial (not yet audioReady) book items, leaves everything else untouched', async () => {
+      await repo.saveAudioItem(
+        sampleItem({ id: 'partial', kind: 'book', audioReady: false, chunkRanges: [{ fromChunkIndex: 0, toChunkIndex: 3 }] }),
+      );
+      await repo.saveAudioItem(
+        sampleItem({ id: 'full', kind: 'book', audioReady: true, chunkRanges: [{ fromChunkIndex: 0, toChunkIndex: 9 }] }),
+      );
+      await repo.saveAudioItem(
+        sampleItem({ id: 'imported', kind: 'imported', chunkRanges: [{ fromChunkIndex: 0, toChunkIndex: 1 }] }),
+      );
+
+      await repo.resetChunkRangesForAllBooks();
+
+      expect((await repo.getAudioItem('partial'))?.chunkRanges).toEqual([]);
+      expect((await repo.getAudioItem('full'))?.chunkRanges).toEqual([{ fromChunkIndex: 0, toChunkIndex: 9 }]);
+      expect((await repo.getAudioItem('imported'))?.chunkRanges).toEqual([{ fromChunkIndex: 0, toChunkIndex: 1 }]);
+    });
   });
 
   it('deleteMany removes exactly the given ids and sums their size', async () => {

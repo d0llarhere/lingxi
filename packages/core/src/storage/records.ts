@@ -1,6 +1,8 @@
 // Separate store records, kept out of `LingxiDocument` so the frequently-read
 // metadata list never has to deserialize large text/binary payloads.
 
+import type { ChunkIndexRange } from '../playback/chunkRanges';
+
 export interface DocumentTextRecord {
   documentId: string;
   text: string;
@@ -43,4 +45,20 @@ export interface AudioItemRecord {
   documentId: string | null;
   voiceURI: string | null;
   chapterLabel: string | null;
+  // Which chunks (of buildChunkSequence's deterministic whole-document
+  // sequence for this book+voice) have been downloaded for offline playback
+  // — see docs/lingxi-part4/BRIEF_DOWNLOAD_RANGES.md. Only ever set for
+  // kind:'book'; [] for kind:'imported' and for records written before this
+  // field existed (those are always audioReady:true "whole book" exports,
+  // so their range doesn't need to be known explicitly).
+  chunkRanges: ChunkIndexRange[];
+  // Whether `audioBlob` is a real, playable, fully-concatenated file (true
+  // once chunkRanges covers the entire book and exportAudio has run) as
+  // opposed to a placeholder empty Blob for a book that's only partially
+  // downloaded so far — those are only playable by opening the book in the
+  // reader (which plays straight from the segment cache), not via AudioPill.
+  // Missing on records written before this field existed, which were always
+  // a real exported file — defaulted to true when read (see
+  // AudioLibraryRepository's normalize step).
+  audioReady: boolean;
 }

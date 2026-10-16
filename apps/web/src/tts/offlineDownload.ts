@@ -1,110 +1,280 @@
-import { buildChunkSequence, detectChapters, type LingxiDocument } from '@lingxi/core';
+import {
+  buildChunkSequence,
+  detectChapters,
+  subtractChunkRanges,
+  type AudioItemRecord,
+  type ChunkIndexRange,
+  type DownloadJobRecord,
+  type LingxiDocument,
+} from '@lingxi/core';
 import { collectCachedSegments } from '../export/collectCachedSegments';
 import { exportAudio } from '../export/exportAudio';
 import { exportSrt } from '../export/exportSrt';
 import { getAudioLibraryRepository } from '../library/audioLibraryInstance';
+import { getLibraryRepository } from '../library/libraryRepositoryInstance';
 import { readChapterDetectionSettings } from '../settings/useChapterDetection';
+import { getDownloadJobRepository } from './downloadJobInstance';
 import { cachingEngine } from './ttsEngineInstance';
 
-export type OfflineDownloadStatus = 'not-started' | 'downloading' | 'ready' | 'error';
-
-export interface OfflineDownloadSnapshot {
-  status: OfflineDownloadStatus;
-  progress: number; // 0..1
-  error: string | null;
-  // Estimated seconds remaining, extrapolated from the average time per
-  // chunk actually observed so far this run — not a guess made up front.
-  // null until at least one chunk has completed (one data point isn't a
-  // trustworthy rate yet) or when not downloading.
+export type DownloadJobSnapshot = {
+  status: DownloadJobRecord['status'];
+  fromChunkIndex: number;
+  toChunkIndex: number;
+  progress: number; // 0..1, within this job's own requested range
   etaSeconds: number | null;
-}
+  error: string | null;
+};
 
-type StatusListener = (snapshot: OfflineDownloadSnapshot) => void;
+type SnapshotListener = (snapshot: DownloadJobSnapshot | null) => void;
 
-// Walks a document's chunks (the same multi-sentence grouping live playback
-// uses — see chunking.ts) and populates the segment cache for a given
-// voice/rate without playing anything, for later fully-offline playback (and
-// as the thing that makes export's "fully cached" gate achievable without
-// first reading the whole document start to finish). Chunk granularity
-// matters: it's what keeps this sharing cache entries with ordinary playback
-// instead of silently re-synthesizing everything the document may have
-// already had played naturally. Same status/subscribe shape as
-// KokoroTTSEngine's model-download tracking — PlaybackControls.tsx reuses
-// the exact same local-voice-status JSX/CSS for both.
-export class OfflineDownloader {
-  private status: OfflineDownloadStatus = 'not-started';
-  private progress = 0;
-  private error: string | null = null;
-  private etaSeconds: number | null = null;
-  private listeners = new Set<StatusListener>();
-  // Bumped on every download() call so a stale run's in-flight loop stops
-  // updating status once a newer run (or a different document) supersedes it.
-  private activeRun = 0;
+// Replaces the old whole-book-only, in-memory-only downloader with a
+// persisted, resumable, one-job-at-a-time FIFO queue — see
+// docs/lingxi-part4/BRIEF_DOWNLOAD_RANGES.md. No fine-grained per-chunk
+// progress is persisted: on resume (a fresh page load, or Resume after a
+// pause) the job's whole [fromChunkIndex, toChunkIndex] range is walked
+// again through cachingEngine.ensureCached() — already-cached chunks are a
+// cheap cache-hit read, not re-synthesis, so this is correct and fast
+// without needing to track exactly which chunk a run stopped at.
+//
+// Per-documentId status (not a single global snapshot like before) since
+// jobs for different books can be queued at once, even though only one
+// actually runs at a time.
+export class DownloadQueue {
+  private queue: DownloadJobRecord[] = [];
+  private activeJob: DownloadJobRecord | null = null;
+  private activeGeneration = 0;
+  private pauseOrCancelIntent: 'pause' | 'cancel' | null = null;
+  private listeners = new Map<string, Set<SnapshotListener>>();
+  private snapshots = new Map<string, DownloadJobSnapshot>();
+  private ready: Promise<void>;
 
-  getStatusSnapshot(): OfflineDownloadSnapshot {
-    return { status: this.status, progress: this.progress, error: this.error, etaSeconds: this.etaSeconds };
+  constructor() {
+    this.ready = this.loadPersistedJobs();
   }
 
-  subscribe(listener: StatusListener): () => void {
-    this.listeners.add(listener);
-    listener(this.getStatusSnapshot());
-    return () => this.listeners.delete(listener);
+  private async loadPersistedJobs(): Promise<void> {
+    const repo = await getDownloadJobRepository();
+    const jobs = await repo.listJobs();
+    for (const job of jobs) {
+      // Nothing is actually running right after a fresh page load — a
+      // job that was 'downloading' when the page closed just means it was
+      // interrupted mid-run; treat it the same as 'queued' so the FIFO loop
+      // picks it back up.
+      const resumable: DownloadJobRecord = job.status === 'downloading' ? { ...job, status: 'queued' } : job;
+      if (resumable.status === 'queued') this.queue.push(resumable);
+      this.publishSnapshot(resumable.documentId, this.snapshotFor(resumable));
+    }
+    void this.processNext();
   }
 
-  private setStatus(status: OfflineDownloadStatus, progress: number, etaSeconds: number | null, error: string | null = null): void {
-    this.status = status;
-    this.progress = progress;
-    this.etaSeconds = etaSeconds;
-    this.error = error;
-    for (const listener of this.listeners) listener(this.getStatusSnapshot());
+  getJobSnapshot(documentId: string): DownloadJobSnapshot | null {
+    return this.snapshots.get(documentId) ?? null;
   }
 
-  async download(doc: LingxiDocument, documentText: string, voiceURI: string, rate: number): Promise<void> {
-    const runId = ++this.activeRun;
-    const chunks = buildChunkSequence(doc.structure, documentText);
-    const startedAt = Date.now();
-    this.setStatus('downloading', 0, null);
+  subscribe(documentId: string, listener: SnapshotListener): () => void {
+    let set = this.listeners.get(documentId);
+    if (!set) {
+      set = new Set();
+      this.listeners.set(documentId, set);
+    }
+    set.add(listener);
+    listener(this.getJobSnapshot(documentId));
+    return () => set!.delete(listener);
+  }
 
-    for (let i = 0; i < chunks.length; i++) {
-      if (runId !== this.activeRun) return; // superseded by a newer download() call
-      try {
-        // Sequential, not parallel: naturally paces requests well under the
-        // proxy's rate limit (real synthesis latency per chunk already
-        // dominates — each chunk is ~900 chars, not one short sentence, so
-        // there are far fewer requests total than the old per-sentence
-        // design needed), and keeps Kokoro's single-worker generation queue
-        // from being flooded.
-        await cachingEngine.ensureCached(chunks[i]!.text, voiceURI, rate);
-      } catch (error) {
-        if (runId !== this.activeRun) return;
-        this.setStatus('error', i / chunks.length, null, error instanceof Error ? error.message : 'Download failed.');
-        return;
-      }
-      const completed = i + 1;
-      // Extrapolated from this run's own observed average, not a canned
-      // per-chunk guess — synthesis latency differs wildly between a local
-      // Kokoro WASM worker and a network round-trip through the Aria proxy,
-      // so only a live measurement is trustworthy.
-      const avgMsPerChunk = (Date.now() - startedAt) / completed;
-      const remaining = chunks.length - completed;
-      const eta = remaining > 0 ? (avgMsPerChunk * remaining) / 1000 : null;
-      this.setStatus('downloading', completed / chunks.length, eta);
+  async enqueue(doc: LingxiDocument, voiceURI: string, rate: number, range: ChunkIndexRange): Promise<void> {
+    await this.ready;
+    const job: DownloadJobRecord = {
+      id: crypto.randomUUID(),
+      documentId: doc.id,
+      title: doc.title,
+      voiceURI,
+      rate,
+      fromChunkIndex: range.fromChunkIndex,
+      toChunkIndex: range.toChunkIndex,
+      status: 'queued',
+      error: null,
+      createdAt: Date.now(),
+    };
+    const repo = await getDownloadJobRepository();
+    await repo.saveJob(job);
+    this.queue.push(job);
+    this.publishSnapshot(job.documentId, this.snapshotFor(job));
+    void this.processNext();
+  }
+
+  async pause(documentId: string): Promise<void> {
+    await this.ready;
+    await this.stopOrRemove(documentId, 'pause');
+  }
+
+  async cancel(documentId: string): Promise<void> {
+    await this.ready;
+    await this.stopOrRemove(documentId, 'cancel');
+  }
+
+  // A paused *or* errored job can be picked back up the same way.
+  async resume(documentId: string): Promise<void> {
+    await this.ready;
+    const repo = await getDownloadJobRepository();
+    const stored = (await repo.listJobs()).find((j) => j.documentId === documentId && (j.status === 'paused' || j.status === 'error'));
+    if (!stored) return;
+    const resumed: DownloadJobRecord = { ...stored, status: 'queued', error: null };
+    await repo.saveJob(resumed);
+    this.queue.push(resumed);
+    this.publishSnapshot(documentId, this.snapshotFor(resumed));
+    void this.processNext();
+  }
+
+  private async stopOrRemove(documentId: string, intent: 'pause' | 'cancel'): Promise<void> {
+    if (this.activeJob?.documentId === documentId) {
+      // Interrupts the running loop; it persists/deletes the job itself
+      // once it notices the generation changed (see processJob).
+      this.pauseOrCancelIntent = intent;
+      this.activeGeneration++;
+      return;
     }
 
-    if (runId !== this.activeRun) return;
-    await this.persistAudioItem(doc, documentText, voiceURI, rate);
-    if (runId !== this.activeRun) return;
-    this.setStatus('ready', 1, null);
+    const repo = await getDownloadJobRepository();
+    const queueIndex = this.queue.findIndex((j) => j.documentId === documentId);
+    const queued = queueIndex !== -1 ? this.queue.splice(queueIndex, 1)[0]! : null;
+    const stored = queued ?? (await repo.listJobs()).find((j) => j.documentId === documentId);
+    if (!stored) return;
+
+    if (intent === 'cancel') {
+      await repo.deleteJob(stored.id);
+      this.publishSnapshot(documentId, null);
+    } else {
+      const paused: DownloadJobRecord = { ...stored, status: 'paused' };
+      await repo.saveJob(paused);
+      this.publishSnapshot(documentId, this.snapshotFor(paused));
+    }
   }
 
-  // Once every chunk is cached, the book qualifies for exactly the same
-  // "fully cached" export the reader's pill menu already offers — reused
-  // as-is here to build the Downloads page's 'book' audio item, rather
-  // than re-deriving a concatenated blob a second way. A failure here
-  // (e.g. exportAudio somehow finding a gap) is logged, not surfaced as a
-  // download error — the offline-playback cache itself is still correct
-  // and complete either way; only the Downloads-page listing is affected.
-  private async persistAudioItem(doc: LingxiDocument, documentText: string, voiceURI: string, rate: number): Promise<void> {
+  private async processNext(): Promise<void> {
+    if (this.activeJob) return; // one job at a time
+    const job = this.queue.shift();
+    if (!job) return;
+    await this.processJob(job);
+  }
+
+  private async processJob(job: DownloadJobRecord): Promise<void> {
+    const generation = ++this.activeGeneration;
+    this.pauseOrCancelIntent = null;
+    this.activeJob = job;
+
+    const jobRepo = await getDownloadJobRepository();
+    await jobRepo.saveJob({ ...job, status: 'downloading' });
+    this.publishSnapshot(job.documentId, this.snapshotFor({ ...job, status: 'downloading' }));
+
+    const libraryRepo = await getLibraryRepository();
+    const [doc, documentText] = await Promise.all([libraryRepo.getDocument(job.documentId), libraryRepo.getDocumentText(job.documentId)]);
+    if (!doc || !documentText) {
+      // The book was deleted since this job was queued — nothing left to download.
+      await jobRepo.deleteJob(job.id);
+      this.publishSnapshot(job.documentId, null);
+      this.activeJob = null;
+      void this.processNext();
+      return;
+    }
+
+    const chunks = buildChunkSequence(doc.structure, documentText);
+    const audioRepo = await getAudioLibraryRepository();
+    const recordId = `book-${doc.id}-${job.voiceURI}-${job.rate}`;
+    const existingBefore = await audioRepo.getAudioItem(recordId);
+    const alreadyCovered = existingBefore?.chunkRanges ?? [];
+
+    let addedSizeBytes = 0;
+    let addedDurationMs = 0;
+    let lastCompletedIndex = job.fromChunkIndex - 1;
+    let runError: string | null = null;
+    const startedAt = Date.now();
+    const total = job.toChunkIndex - job.fromChunkIndex + 1;
+
+    for (let i = job.fromChunkIndex; i <= job.toChunkIndex && i < chunks.length; i++) {
+      if (this.activeGeneration !== generation) break;
+      const chunk = chunks[i]!;
+      try {
+        // Sequential, not parallel — see the old OfflineDownloader's own
+        // reasoning (naturally paces requests, doesn't flood Kokoro's
+        // single-worker queue).
+        const segment = await cachingEngine.ensureCached(chunk.text, job.voiceURI, job.rate);
+        lastCompletedIndex = i;
+        if (subtractChunkRanges({ fromChunkIndex: i, toChunkIndex: i }, alreadyCovered).length > 0) {
+          addedSizeBytes += segment.audioBlob.size;
+          addedDurationMs += segment.durationMs;
+        }
+      } catch (error) {
+        runError = error instanceof Error ? error.message : 'Download failed.';
+        break;
+      }
+      if (this.activeGeneration !== generation) break;
+      const completed = i - job.fromChunkIndex + 1;
+      const avgMsPerChunk = (Date.now() - startedAt) / completed;
+      const remaining = total - completed;
+      const etaSeconds = remaining > 0 ? (avgMsPerChunk * remaining) / 1000 : null;
+      this.publishSnapshot(job.documentId, this.snapshotFor({ ...job, status: 'downloading' }, completed / total, etaSeconds));
+    }
+
+    // Persist whatever was actually completed this run, regardless of how
+    // the loop ended — already-cached chunks are never lost, so partial
+    // progress (a pause, a cancel, or an error partway through) should
+    // never be silently dropped from the book's saved-ranges display.
+    if (lastCompletedIndex >= job.fromChunkIndex) {
+      const updated = await audioRepo.mergeDownloadedRange({
+        id: recordId,
+        documentId: doc.id,
+        title: doc.title,
+        voiceURI: job.voiceURI,
+        rate: job.rate,
+        range: { fromChunkIndex: job.fromChunkIndex, toChunkIndex: lastCompletedIndex },
+        addedSizeBytes,
+        addedDurationMs,
+      });
+      await this.maybeFinalizeFullBook(doc, documentText, chunks.length, updated, job.voiceURI, job.rate);
+    }
+
+    const interrupted = this.activeGeneration !== generation;
+    if (interrupted && this.pauseOrCancelIntent === 'cancel') {
+      await jobRepo.deleteJob(job.id);
+      this.publishSnapshot(job.documentId, null);
+    } else if (interrupted && this.pauseOrCancelIntent === 'pause') {
+      const paused: DownloadJobRecord = { ...job, status: 'paused' };
+      await jobRepo.saveJob(paused);
+      this.publishSnapshot(job.documentId, this.snapshotFor(paused));
+    } else if (!interrupted && runError) {
+      const errored: DownloadJobRecord = { ...job, status: 'error', error: runError };
+      await jobRepo.saveJob(errored);
+      this.publishSnapshot(job.documentId, this.snapshotFor(errored));
+    } else if (!interrupted) {
+      await jobRepo.deleteJob(job.id);
+      this.publishSnapshot(job.documentId, null);
+    }
+
+    this.activeJob = null;
+    void this.processNext();
+  }
+
+  // Once a book's coverage reaches the whole document, it qualifies for
+  // exactly the same "fully cached" export the reader's pill menu already
+  // offers — reused as-is (exportAudio/exportSrt/collectCachedSegments,
+  // unchanged) to materialize the single playable blob, same as the old
+  // whole-book-only downloader always did. A failure here is logged, not
+  // surfaced as a download error — the per-chunk cache (and thus offline
+  // reader playback) is already correct and complete either way; only the
+  // Downloads page's "play like a podcast file" ability is affected.
+  private async maybeFinalizeFullBook(
+    doc: LingxiDocument,
+    documentText: string,
+    totalChunks: number,
+    record: AudioItemRecord,
+    voiceURI: string,
+    rate: number,
+  ): Promise<void> {
+    if (record.audioReady || totalChunks === 0) return;
+    const coversWholeBook = record.chunkRanges.length === 1 && record.chunkRanges[0]!.fromChunkIndex === 0 && record.chunkRanges[0]!.toChunkIndex === totalChunks - 1;
+    if (!coversWholeBook) return;
+
     try {
       const [audio, srt, records] = await Promise.all([
         exportAudio(doc, documentText, voiceURI, rate),
@@ -115,35 +285,44 @@ export class OfflineDownloader {
 
       const chapters = detectChapters(documentText, readChapterDetectionSettings());
       const chapterLabel = chapters.length > 0 ? `Ch. 1–${chapters.length}` : 'Whole book';
-      const durationMs = records.reduce((sum, record) => sum + record.durationMs, 0);
+      const durationMs = records.reduce((sum, r) => sum + r.durationMs, 0);
       const subtitleText = srt ? await srt.blob.text() : null;
 
-      const repo = await getAudioLibraryRepository();
-      await repo.saveAudioItem({
-        // Deterministic so re-downloading the same book/voice/rate updates
-        // the existing item in place instead of duplicating it.
-        id: `book-${doc.id}-${voiceURI}-${rate}`,
-        kind: 'book',
-        title: doc.title,
-        createdAt: Date.now(),
-        lastPlayedAt: null,
+      const audioRepo = await getAudioLibraryRepository();
+      await audioRepo.saveAudioItem({
+        ...record,
         sizeBytes: audio.blob.size,
         durationMs,
         audioBlob: audio.blob,
         mimeType: audio.blob.type,
-        positionMs: 0,
-        rate,
         subtitlesOn: subtitleText !== null,
         subtitleFilename: subtitleText ? `${doc.title}.srt` : null,
         subtitleText,
-        documentId: doc.id,
-        voiceURI,
         chapterLabel,
+        audioReady: true,
       });
     } catch (error) {
-      console.error('Failed to save downloaded audio item', error);
+      console.error('Failed to finalize fully-downloaded book audio', error);
     }
+  }
+
+  private publishSnapshot(documentId: string, snapshot: DownloadJobSnapshot | null): void {
+    if (snapshot) this.snapshots.set(documentId, snapshot);
+    else this.snapshots.delete(documentId);
+    const set = this.listeners.get(documentId);
+    if (set) for (const listener of set) listener(snapshot);
+  }
+
+  private snapshotFor(job: DownloadJobRecord, progress = 0, etaSeconds: number | null = null): DownloadJobSnapshot {
+    return {
+      status: job.status,
+      fromChunkIndex: job.fromChunkIndex,
+      toChunkIndex: job.toChunkIndex,
+      progress,
+      etaSeconds,
+      error: job.error,
+    };
   }
 }
 
-export const offlineDownloader = new OfflineDownloader();
+export const offlineDownloader = new DownloadQueue();

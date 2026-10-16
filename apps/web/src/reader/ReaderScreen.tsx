@@ -1,4 +1,5 @@
 import {
+  buildChunkSequence,
   detectChapters,
   findPageIndexAtOffset,
   findWordIndexAtOrAfterOffset,
@@ -126,7 +127,7 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
     { type: 'minutes'; label: string; firesAt: number } | { type: 'end-of-chapter'; label: string; chapterNumberAtSet: number } | null
   >(null);
   const [kokoroStatus, setKokoroStatus] = useState(kokoroEngine.getStatusSnapshot());
-  const [offlineDownloadStatus, setOfflineDownloadStatus] = useState(offlineDownloader.getStatusSnapshot());
+  const [offlineDownloadStatus, setOfflineDownloadStatus] = useState(offlineDownloader.getJobSnapshot(documentId));
   const [ariaWakeStatus, setAriaWakeStatus] = useState(ariaWakeTracker.getStatus());
 
   // The Kokoro model/download state is app-global (one Worker, one model),
@@ -140,13 +141,11 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
 
   const handleDownloadKokoro = useCallback(() => kokoroEngine.download(), []);
 
-  // offlineDownloader is a single app-global instance (like kokoroEngine),
-  // so its last status can be leftover from a *different* document — reset
-  // to not-started on every document switch, then let the subscription
-  // reflect reality for this document going forward.
+  // offlineDownloader's status is now tracked per documentId (a queue, not
+  // a single global in-flight download), so no manual reset is needed on a
+  // document switch — just re-subscribe to this document's own status.
   useEffect(() => {
-    setOfflineDownloadStatus({ status: 'not-started', progress: 0, error: null, etaSeconds: null });
-    return offlineDownloader.subscribe(setOfflineDownloadStatus);
+    return offlineDownloader.subscribe(documentId, setOfflineDownloadStatus);
   }, [documentId]);
 
   // Shared by the old controls' speed row, the pill's speed chip/stepper,
@@ -188,9 +187,14 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
     else controller.nextParagraph();
   }, [listeningDefaults.skipBy, skipSeconds]);
 
+  // Interim whole-book trigger — replaced by the range dialog (Whole
+  // book/Chapters/Pages) in a follow-up commit; for now this just keeps the
+  // existing whole-book behavior working against the new queue API.
   const handleDownloadOffline = useCallback(() => {
     if (!loaded || !voiceURI) return;
-    void offlineDownloader.download(loaded.doc, loaded.text, voiceURI, rate);
+    const totalChunks = buildChunkSequence(loaded.doc.structure, loaded.text).length;
+    if (totalChunks === 0) return;
+    void offlineDownloader.enqueue(loaded.doc, voiceURI, rate, { fromChunkIndex: 0, toChunkIndex: totalChunks - 1 });
   }, [loaded, voiceURI, rate]);
 
   // Raw chapter detection, memoized once (detectChapters scans the whole
@@ -303,7 +307,7 @@ export function ReaderScreen({ documentId, autoplay, onBack }: ReaderScreenProps
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, voiceURI, rate, offlineDownloadStatus.status, playbackState]);
+  }, [loaded, voiceURI, rate, offlineDownloadStatus?.status, playbackState]);
 
   const handleExportAudio = useCallback(async () => {
     if (!loaded || !voiceURI) return;

@@ -207,6 +207,8 @@ describe('LibraryRepository.deleteDocument cascade', () => {
       documentId: null,
       voiceURI: 'kokoro:af_bella',
       chapterLabel: 'Whole book',
+      chunkRanges: [],
+      audioReady: true,
       ...overrides,
     };
   }

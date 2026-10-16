@@ -4,7 +4,7 @@ import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, MoonIcon, PlayIcon } f
 import { EDGE_VOICE_PREFIX } from '../tts/edge/EdgeTTSEngine';
 import { KOKORO_VOICE_PREFIX } from '../tts/kokoro/KokoroTTSEngine';
 import type { KokoroStatusSnapshot } from '../tts/kokoro/KokoroTTSEngine';
-import type { OfflineDownloadSnapshot } from '../tts/offlineDownload';
+import type { DownloadJobSnapshot } from '../tts/offlineDownload';
 
 // Mirrors PlaybackController's own clamp range (see playbackController.ts) —
 // not exported from core since this is the brief's UI-level stepper range,
@@ -37,7 +37,7 @@ interface PlaybackMenuProps {
   onSetSleepTimer: (choice: SleepTimerChoice) => void;
   kokoroStatus: KokoroStatusSnapshot;
   onDownloadKokoro: () => void;
-  offlineDownloadStatus: OfflineDownloadSnapshot;
+  offlineDownloadStatus: DownloadJobSnapshot | null;
   onDownloadOffline: () => void;
   // Only offered once the whole book is cached for the selected voice (see
   // CachingTTSEngine) — same gating the old PlaybackControls bar used.
@@ -188,13 +188,14 @@ export function PlaybackMenu({
               <span className="pill-mi-text">
                 Download for offline
                 <span className="pill-mi-sub">
-                  {offlineDownloadStatus.status === 'ready' && 'Saved for offline'}
-                  {offlineDownloadStatus.status === 'not-started' && 'Not downloaded · whole book'}
-                  {offlineDownloadStatus.status === 'downloading' && `${Math.round(offlineDownloadStatus.progress * 100)}% downloaded`}
-                  {offlineDownloadStatus.status === 'error' && `Failed: ${offlineDownloadStatus.error}`}
+                  {!offlineDownloadStatus && 'Not downloaded'}
+                  {offlineDownloadStatus?.status === 'queued' && 'Queued'}
+                  {offlineDownloadStatus?.status === 'paused' && 'Paused'}
+                  {offlineDownloadStatus?.status === 'downloading' && `Downloading · ${Math.round(offlineDownloadStatus.progress * 100)}%`}
+                  {offlineDownloadStatus?.status === 'error' && `Failed: ${offlineDownloadStatus.error}`}
                 </span>
               </span>
-              {offlineDownloadStatus.status === 'downloading' && (
+              {offlineDownloadStatus?.status === 'downloading' && (
                 <div className="pill-mi-progress">
                   <div className="pill-mi-progress-fill" style={{ width: `${offlineDownloadStatus.progress * 100}%` }} />
                 </div>
