@@ -66,6 +66,10 @@ npm test
 
 Runs the `packages/core` test suite (Vitest).
 
+## Author
+
+Made by [d0llarhere](https://github.com/d0llarhere).
+
 ## License
 
 MIT — see [`LICENSE`](LICENSE).
