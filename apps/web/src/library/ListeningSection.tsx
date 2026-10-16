@@ -4,6 +4,7 @@ import { ChevronDownIcon, PlayIcon } from '../components/icons';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { Switch } from '../components/Switch';
 import { filterVoicesByOnlinePolicy, type ListeningDefaults, useListeningDefaults } from '../settings/useListeningDefaults';
+import { EDGE_VOICES } from '../tts/edge/EdgeTTSEngine';
 import { previewVoice } from '../tts/previewVoice';
 import { kokoroEngine, ttsEngine } from '../tts/ttsEngineInstance';
 
@@ -177,6 +178,16 @@ export function ListeningSection() {
             </div>
             <Switch checked={defaults.allowOnlineVoices} onChange={handleAllowOnlineVoicesChange} ariaLabel="Allow online voices" />
           </div>
+
+          {EDGE_VOICES.length === 0 && (
+            <div className="storage-row">
+              <p className="status-message">
+                No online voice is configured — Kokoro's on-device voices need no setup and work fully
+                offline. To add an online voice like Aria, deploy your own free relay (see
+                apps/tts-proxy/README.md in the project repo) and set VITE_TTS_PROXY_URL.
+              </p>
+            </div>
+          )}
 
           {!defaults.allowOnlineVoices && !defaults.defaultVoiceURI && !hasOnDeviceVoice && (
             <div className="storage-row">

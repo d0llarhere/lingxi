@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: lingxi-tts-proxy
+    runtime: node
+    rootDir: apps/tts-proxy
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: ALLOWED_ORIGIN
+        value: "*"

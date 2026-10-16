@@ -3,6 +3,18 @@ dist/
 *.log
 .DS_Store
 
+# Generated at npm install time (apps/web/scripts/copy-ort-assets.mjs) —
+# byte-identical to node_modules/onnxruntime-web/dist, no reason to commit it
+apps/web/public/ort/
+
+# Local test fixtures (copyrighted source material, kept out of git)
+Test_pdfs/
+
+# Secrets / local overrides — never commit
+.env
+.env.local
+.env.*.local
+
 # AI tool configs
 .agent/
 .agents/

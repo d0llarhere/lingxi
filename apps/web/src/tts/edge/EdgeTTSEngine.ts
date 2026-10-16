@@ -1,28 +1,29 @@
 import type { SpeakOptions, TTSEngine, VoiceInfo, WordAnchor } from '@lingxi/core';
 import { playAudioSegment, type AudioPlaybackHandle } from '../playAudioSegment';
 
+// A direct browser WebSocket to Microsoft's endpoint can't work (verified
+// empirically — see ARCHITECTURE.md's "Aria voice" exception): the endpoint
+// checks the connecting Origin, which no page JS in any browser can
+// override. apps/tts-proxy is the server-side proxy that makes this voice
+// reachable at all — there's no shared default deployment, since this repo
+// is public; each user who wants the Aria voice deploys their own free
+// instance (see apps/tts-proxy/README.md) and points VITE_TTS_PROXY_URL at
+// it. Left unset, Lingxi works fully offline with Kokoro only.
+const PROXY_URL = import.meta.env.VITE_TTS_PROXY_URL as string | undefined;
+
 // The only Edge voice Lingxi exposes. As with Kokoro, the full ~300-voice
 // Edge catalog is never fetched or shown — just this one curated voice.
 // Unlike every other voice in the app, this one requires internet: it talks
 // to Microsoft's online neural TTS service, not anything running on-device
 // (see ARCHITECTURE.md's offline-first goal — this is a deliberate, opt-in
-// exception, never the default voice).
-export const EDGE_VOICES: VoiceInfo[] = [
-  { voiceURI: 'edge:en-US-AriaNeural', name: 'Aria', lang: 'en-US', localService: false, default: false },
-];
+// exception, never the default voice). Only listed when a proxy is actually
+// configured — see PROXY_URL above — so there's nothing to select that
+// can't work.
+export const EDGE_VOICES: VoiceInfo[] = PROXY_URL
+  ? [{ voiceURI: 'edge:en-US-AriaNeural', name: 'Aria', lang: 'en-US', localService: false, default: false }]
+  : [];
 
 export const EDGE_VOICE_PREFIX = 'edge:';
-
-// A direct browser WebSocket to Microsoft's endpoint can't work (verified
-// empirically — see ARCHITECTURE.md's "Aria voice" exception): the endpoint
-// checks the connecting Origin, which no page JS in any browser can
-// override. apps/tts-proxy is the server-side proxy that makes this voice
-// reachable at all. Deployed on Render (not Cloudflare Workers — Microsoft
-// blocks/rate-limits Workers' egress IP ranges specifically, confirmed
-// empirically). Set VITE_TTS_PROXY_URL to override with a different
-// deployment if needed.
-const DEFAULT_PROXY_URL = 'https://lingxi-tts-proxy.onrender.com';
-const PROXY_URL = (import.meta.env.VITE_TTS_PROXY_URL as string | undefined) || DEFAULT_PROXY_URL;
 
 // Render's free tier sleeps the service after ~15min idle; the first request
 // after that takes 30-50s to wake before it even starts processing, on top
