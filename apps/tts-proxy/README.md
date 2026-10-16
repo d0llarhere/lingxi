@@ -11,10 +11,9 @@ their own free copy and points their own Lingxi build at it.
 
 ## Deploy your own (one click)
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=<YOUR_REPO_URL_HERE>)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/d0llarhere/lingxi)
 
-Replace `<YOUR_REPO_URL_HERE>` with this repo's GitHub URL once it's pushed. Render reads
-`render.yaml` in this directory and spins up a free web service automatically.
+Render reads `render.yaml` in this directory and spins up a free web service automatically.
 
 ## Manual deploy (works even without the button above)
 
