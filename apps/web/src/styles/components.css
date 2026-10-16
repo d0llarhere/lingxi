@@ -93,15 +93,41 @@
   gap: var(--space-4);
 }
 
+.modal-panel-wide {
+  max-width: 520px;
+}
+
+/* Download-range dialog only (scoped via .modal-panel-wide, not every
+   dialog) — becomes a bottom sheet under ~480px, per the brief. */
+@media (max-width: 480px) {
+  .modal-overlay:has(.modal-panel-wide) {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal-panel-wide {
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}
+
 .modal-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: var(--space-3);
 }
 
 .modal-title {
   font-size: var(--font-size-md);
   font-weight: 700;
+}
+
+.modal-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  margin-top: 4px;
 }
 
 .modal-actions {
@@ -222,6 +248,11 @@
 .seg-btn-on {
   background: var(--divider);
   color: var(--text);
+}
+
+.seg-btn[aria-disabled='true'] {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
 }
 
 .switch {

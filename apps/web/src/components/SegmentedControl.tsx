@@ -3,6 +3,10 @@ import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 export interface SegmentedOption<T extends string | number> {
   value: T;
   label: ReactNode;
+  disabled?: boolean;
+  // Shown as a title tooltip on the (disabled) option — e.g. explaining why
+  // Chapters is unavailable for a book with none detected.
+  title?: string;
 }
 
 interface SegmentedControlProps<T extends string | number> {
@@ -25,8 +29,13 @@ export function SegmentedControl<T extends string | number>({ ariaLabel, options
     const backward = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
     if (!forward && !backward) return;
     e.preventDefault();
-    const nextIndex = forward ? (index + 1) % options.length : (index - 1 + options.length) % options.length;
+    let nextIndex = index;
+    for (let step = 0; step < options.length; step++) {
+      nextIndex = forward ? (nextIndex + 1) % options.length : (nextIndex - 1 + options.length) % options.length;
+      if (!options[nextIndex]!.disabled) break;
+    }
     const next = options[nextIndex]!;
+    if (next.disabled) return; // every option disabled — nothing to move to
     onChange(next.value);
     refs.current[nextIndex]?.focus();
   }
@@ -39,9 +48,11 @@ export function SegmentedControl<T extends string | number>({ ariaLabel, options
           type="button"
           role="radio"
           aria-checked={option.value === value}
+          aria-disabled={option.disabled}
+          title={option.title}
           tabIndex={option.value === value ? 0 : -1}
           className={`seg-btn${option.value === value ? ' seg-btn-on' : ''}`}
-          onClick={() => onChange(option.value)}
+          onClick={() => !option.disabled && onChange(option.value)}
           onKeyDown={(e) => handleKeyDown(e, i)}
           ref={(el) => {
             refs.current[i] = el;

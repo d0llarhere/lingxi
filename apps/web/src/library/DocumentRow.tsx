@@ -1,13 +1,11 @@
-import { buildChunkSequence, detectChapters, type ChapterRef } from '@lingxi/core';
+import { detectChapters, type ChapterRef } from '@lingxi/core';
 import { useEffect, useState } from 'react';
 import { DownloadIcon, EditIcon, PlayIcon, TrashIcon } from '../components/icons';
 import { OverflowMenu } from '../components/OverflowMenu';
-import { EDGE_VOICE_PREFIX } from '../tts/edge/EdgeTTSEngine';
-import { KOKORO_VOICE_PREFIX } from '../tts/kokoro/KokoroTTSEngine';
-import { offlineDownloader } from '../tts/offlineDownload';
 import { ESTIMATED_CHARS_PER_SECOND_AT_RATE_1 } from '../reader/formatDuration';
 import { useChapterDetection } from '../settings/useChapterDetection';
 import type { DocumentCardData } from './DocumentCard';
+import { DownloadRangeDialog } from './DownloadRangeDialog';
 import { useLibrary } from './LibraryProvider';
 
 interface DocumentRowProps {
@@ -64,6 +62,7 @@ export function DocumentRow({ data, onOpen, onPlay, onRename, onDelete }: Docume
   const { repository } = useLibrary();
   const { settings: chapterDetection } = useChapterDetection();
   const [chapter, setChapter] = useState<{ number: number; title: string } | null>(null);
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const percent = Math.round(progress * 100);
   const color = thumbColor(doc.title);
 
@@ -92,22 +91,9 @@ export function DocumentRow({ data, onOpen, onPlay, onRename, onDelete }: Docume
   const sourceLabel = doc.sourceType === 'pdf' ? 'PDF' : 'Text';
   const positionLabel = progress <= 0 ? 'not started' : chapter ? `Chapter ${chapter.number} · ${chapter.title}` : `${percent}% read`;
 
-  // Interim whole-book trigger — replaced by the range dialog (Whole
-  // book/Chapters/Pages) in a follow-up commit; for now this just keeps the
-  // existing whole-book behavior working against the new queue API.
-  async function handleDownloadOffline() {
-    if (!repository) return;
-    const [text, settings] = await Promise.all([repository.getDocumentText(doc.id), repository.getPlaybackSettings(doc.id)]);
-    const voiceURI = settings.selectedVoiceURI;
-    if (!text || !voiceURI) return;
-    const totalChunks = buildChunkSequence(doc.structure, text).length;
-    if (totalChunks === 0) return;
-    void offlineDownloader.enqueue(doc, voiceURI, settings.playbackSpeed, { fromChunkIndex: 0, toChunkIndex: totalChunks - 1 });
-  }
-
   const menuActions = [
     { label: 'Rename', icon: <EditIcon />, onSelect: onRename },
-    { label: 'Download for offline', icon: <DownloadIcon />, onSelect: handleDownloadOffline },
+    { label: 'Download for offline', icon: <DownloadIcon />, onSelect: () => setDownloadDialogOpen(true) },
     { label: 'Delete', icon: <TrashIcon />, onSelect: onDelete, danger: true },
   ];
 
@@ -141,6 +127,7 @@ export function DocumentRow({ data, onOpen, onPlay, onRename, onDelete }: Docume
         </button>
         <OverflowMenu actions={menuActions} label={`More actions for ${doc.title}`} />
       </div>
+      {downloadDialogOpen && <DownloadRangeDialog documentId={doc.id} onClose={() => setDownloadDialogOpen(false)} />}
     </div>
   );
 }
