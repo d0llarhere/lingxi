@@ -4,6 +4,11 @@ A PDF/text reader with synced text-to-speech playback, offline downloads, and hi
 word-by-word read-along. Everything runs locally in your browser — your books and audio never
 leave your device unless you explicitly opt into an online voice.
 
+<p align="center">
+  <img src="docs/screenshots/library.jpg" alt="Lingxi library screen" width="48%">
+  <img src="docs/screenshots/reader.jpg" alt="Lingxi reader with synced word highlighting" width="48%">
+</p>
+
 ## Features
 
 - Read PDFs and plain text, with automatic chapter and page detection.
