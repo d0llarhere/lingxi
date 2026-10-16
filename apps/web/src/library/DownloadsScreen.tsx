@@ -55,10 +55,11 @@ function sortCompare(a: AudioItemRecord, b: AudioItemRecord, key: SortKey): numb
 }
 
 interface DownloadsScreenProps {
+  onOpenDocument: (documentId: string, options?: { autoplay?: boolean }) => void;
   onNavigate: (nav: NavKey, settingsSection?: SettingsSection) => void;
 }
 
-export function DownloadsScreen({ onNavigate }: DownloadsScreenProps) {
+export function DownloadsScreen({ onOpenDocument, onNavigate }: DownloadsScreenProps) {
   const [items, setItems] = useState<AudioItemRecord[] | null>(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
@@ -302,6 +303,7 @@ export function DownloadsScreen({ onNavigate }: DownloadsScreenProps) {
                     item={item}
                     isPlaying={playingId === item.id}
                     onPlay={() => setPlayingId((current) => (current === item.id ? null : item.id))}
+                    onOpenDocument={onOpenDocument}
                     onRename={() => setRenamingItem(item)}
                     onAttachSubtitles={() => {
                       subtitleTargetRef.current = item;

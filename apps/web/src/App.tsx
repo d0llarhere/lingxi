@@ -47,7 +47,10 @@ export function App() {
       ) : view.nav === 'settings' ? (
         <SettingsScreen onNavigate={navigate} initialSection={view.settingsSection} />
       ) : (
-        <DownloadsScreen onNavigate={navigate} />
+        <DownloadsScreen
+          onOpenDocument={(documentId, options) => setView({ type: 'reader', documentId, autoplay: options?.autoplay })}
+          onNavigate={navigate}
+        />
       )}
     </LibraryProvider>
   );

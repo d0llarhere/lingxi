@@ -107,8 +107,16 @@ export function StorageSection({ onOpenLibrary }: StorageSectionProps) {
 
   async function handleClearCache() {
     const freedBytes = cacheSize ?? 0;
-    const cacheRepo = await getSegmentCacheRepository();
+    const [cacheRepo, audioRepo] = await Promise.all([getSegmentCacheRepository(), getAudioLibraryRepository()]);
     await cacheRepo.clear();
+    // Every partially-downloaded book's chunkRanges coverage just went
+    // stale at the same moment — reset it, so the download dialog/Downloads
+    // page don't keep claiming ranges are saved when the audio behind them
+    // is gone (see AudioLibraryRepository.resetChunkRangesForAllBooks).
+    // Leaves any already-exported (audioReady:true) book alone — that blob
+    // is a genuinely separate artifact, same as "Downloaded audio" already
+    // being its own deletable row here, distinct from "Cache".
+    await audioRepo.resetChunkRangesForAllBooks();
     setToast(`Freed ${formatBytes(freedBytes)}`);
     await refresh();
   }

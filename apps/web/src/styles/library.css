@@ -536,6 +536,17 @@
   width: 2.5rem;
 }
 
+/* A job status can be longer than a plain "53%"/"12:34" position (e.g. a
+   synthesis error message) — widen and truncate instead of overflowing
+   into the Length column next to it. */
+.doc-row-progress-value-status {
+  width: auto;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .doc-row-length,
 .doc-row-opened {
   font-size: var(--font-size-sm);
