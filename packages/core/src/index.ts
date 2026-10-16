@@ -23,6 +23,14 @@ export { PlaybackController } from './playback/playbackController';
 export type { PlaybackControllerOptions, PlaybackState } from './playback/playbackController';
 export { buildChunkSequence, DEFAULT_CHUNK_TARGET_CHARS } from './playback/chunking';
 export type { ChunkRef } from './playback/chunking';
+export {
+  chunkCharRanges,
+  chunkRangeForCharOffsets,
+  mergeChunkRanges,
+  snapCharRangeToParagraphs,
+  subtractChunkRanges,
+} from './playback/chunkRanges';
+export type { ChunkIndexRange, CharRange } from './playback/chunkRanges';
 export type { SpeakOptions, TTSEngine, VoiceInfo } from './playback/ttsEngine';
 export { DEFAULT_CHAPTER_DETECTION, detectChapters } from './segmentation/detectChapters';
 export type { ChapterDetectionMode, ChapterDetectionSettings, ChapterRef } from './segmentation/detectChapters';
