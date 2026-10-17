@@ -22,7 +22,7 @@ leave your device unless you explicitly opt into an online voice.
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org) 18.18+ or 20+, and npm (ships with Node).
+- [Node.js](https://nodejs.org) 22.13+ (required by pdfjs-dist), and npm (ships with Node).
 
 Setup is identical on Windows, macOS, and Linux.
 
